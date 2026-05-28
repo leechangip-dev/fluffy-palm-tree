@@ -1,0 +1,20 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "loading": "Loading..."
+  },
+  "errors": {
+    "required": "This field is required.",
+    "invalid_email": "Please enter a valid email address.",
+    "server_error": "A server error has occurred. Please try again later."
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "signup": "Sign Up",
+    "forgot_password": "Forgot your password?"
+  }
+}
