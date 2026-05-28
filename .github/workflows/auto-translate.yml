@@ -1,0 +1,64 @@
+name: Auto Translate
+
+on:
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - "samples/**"
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Translate changed source files
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          # samples/ 에서 변경된 파일 중 번역 결과 파일(언어코드 포함)은 제외
+          CHANGED=$(git diff --name-only HEAD~1 HEAD -- samples/ \
+            | grep -E '\.(md|txt|json|yaml|yml)$' \
+            | grep -vE '\.(en|ja|zh|zh-tw|es|fr|de|pt|vi|ko)\.(md|txt|json|yaml|yml)$' \
+            || true)
+
+          if [ -z "$CHANGED" ]; then
+            echo "번역할 소스 파일 변경 없음"
+            exit 0
+          fi
+
+          echo "번역 대상 파일:"
+          echo "$CHANGED"
+
+          echo "$CHANGED" | while read -r file; do
+            [ -f "$file" ] || continue
+            echo ""
+            echo "=== 번역 시작: $file ==="
+            python src/cli.py file "$file" -t en,ja,zh --delay 0.5
+          done
+
+      - name: Commit translations
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add samples/
+          if git diff --staged --quiet; then
+            echo "새로운 번역 파일 없음"
+          else
+            git commit -m "chore: auto-translate updated source files [skip ci]"
+            git push
+          fi
