@@ -25,3 +25,7 @@ python src/cli.py text "안녕하세요" -t en
 ## 참고 사항
 
 번역 품질을 높이려면 `-c` 옵션으로 문서의 맥락 정보를 추가로 제공할 수 있습니다.
+
+## GitHub Actions 자동 번역
+
+이 파일을 수정하고 push하면 GitHub Actions가 자동으로 영어, 일본어, 중국어 번역 파일을 생성합니다.
