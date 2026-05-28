@@ -4,7 +4,8 @@
     "cancel": "취소",
     "delete": "삭제",
     "confirm": "확인",
-    "loading": "불러오는 중..."
+    "loading": "불러오는 중...",
+    "search": "검색"
   },
   "errors": {
     "required": "필수 항목입니다.",
