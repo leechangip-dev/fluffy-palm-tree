@@ -1,0 +1,21 @@
+{
+  "common": {
+    "save": "保存",
+    "cancel": "取消",
+    "delete": "删除",
+    "confirm": "确认",
+    "loading": "加载中...",
+    "search": "搜索"
+  },
+  "errors": {
+    "required": "此项为必填项。",
+    "invalid_email": "请输入正确的电子邮件地址。",
+    "server_error": "服务器发生错误，请稍后再试。"
+  },
+  "auth": {
+    "login": "登录",
+    "logout": "退出登录",
+    "signup": "注册",
+    "forgot_password": "忘记密码了吗？"
+  }
+}

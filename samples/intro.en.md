@@ -7,7 +7,7 @@ This tool leverages the Claude API to automatically translate various documents 
 - **Multilingual Support**: Supports 10 languages including Korean, English, Japanese, Chinese, and Spanish
 - **File Formats**: Translates Markdown, text, and JSON files
 - **Batch Translation**: Simultaneously translates a single file into multiple languages
-- **Code Preservation**: Content inside code blocks is kept as-is without translation
+- **Code Preservation**: Content inside code blocks is preserved as-is without translation
 
 ## Usage Examples
 
@@ -37,3 +37,9 @@ Supports Markdown, text, JSON, and YAML formats.
 ## Benefits of Automation
 
 Automating repetitive translation tasks can save time and costs. When integrated with GitHub Actions, translation is executed immediately upon file modification.
+
+## Cautions
+
+- Manage your API key as a GitHub Secret to prevent it from being exposed externally.
+- Do not manually edit translation output files (`.en.md`, `.ja.md`, etc.). They will be automatically overwritten when the source file is modified.
+- Large files may take time to translate.

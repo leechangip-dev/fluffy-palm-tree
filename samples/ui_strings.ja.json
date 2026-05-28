@@ -4,12 +4,13 @@
     "cancel": "キャンセル",
     "delete": "削除",
     "confirm": "確認",
-    "loading": "読み込み中..."
+    "loading": "読み込み中...",
+    "search": "検索"
   },
   "errors": {
     "required": "必須項目です。",
     "invalid_email": "正しいメールアドレスを入力してください。",
-    "server_error": "サーバーエラーが発生しました。しばらくしてからもう一度お試しください。"
+    "server_error": "サーバーエラーが発生しました。しばらくしてから再度お試しください。"
   },
   "auth": {
     "login": "ログイン",

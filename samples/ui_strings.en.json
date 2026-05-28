@@ -4,7 +4,8 @@
     "cancel": "Cancel",
     "delete": "Delete",
     "confirm": "Confirm",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "search": "Search"
   },
   "errors": {
     "required": "This field is required.",
