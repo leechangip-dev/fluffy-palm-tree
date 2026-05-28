@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -26,25 +26,39 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Translate changed source files
+      - name: Find changed source files
+        id: detect
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
         run: |
-          # samples/ 에서 변경된 파일 중 번역 결과 파일(언어코드 포함)은 제외
-          CHANGED=$(git diff --name-only HEAD~1 HEAD -- samples/ \
+          # 신규 브랜치(before가 000...) 이면 전체 samples/ 스캔, 아니면 diff
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "신규 브랜치 — samples/ 전체 스캔"
+            ALL=$(git ls-files samples/)
+          else
+            ALL=$(git diff --name-only "$BEFORE" "$AFTER" -- samples/)
+          fi
+
+          # 번역 결과 파일(언어코드 포함) 제외
+          CHANGED=$(echo "$ALL" \
             | grep -E '\.(md|txt|json|yaml|yml)$' \
             | grep -vE '\.(en|ja|zh|zh-tw|es|fr|de|pt|vi|ko)\.(md|txt|json|yaml|yml)$' \
             || true)
 
-          if [ -z "$CHANGED" ]; then
-            echo "번역할 소스 파일 변경 없음"
-            exit 0
-          fi
+          echo "감지된 소스 파일:"
+          echo "${CHANGED:-없음}"
 
-          echo "번역 대상 파일:"
-          echo "$CHANGED"
+          # 줄바꿈을 공백으로 변환해서 output에 저장
+          FILES=$(echo "$CHANGED" | tr '\n' ' ' | xargs)
+          echo "files=$FILES" >> "$GITHUB_OUTPUT"
 
-          echo "$CHANGED" | while read -r file; do
+      - name: Translate
+        if: steps.detect.outputs.files != ''
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          for file in ${{ steps.detect.outputs.files }}; do
             [ -f "$file" ] || continue
             echo ""
             echo "=== 번역 시작: $file ==="
@@ -52,6 +66,7 @@ jobs:
           done
 
       - name: Commit translations
+        if: steps.detect.outputs.files != ''
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
