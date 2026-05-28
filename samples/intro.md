@@ -29,3 +29,7 @@ python src/cli.py text "안녕하세요" -t en
 ## GitHub Actions 자동 번역
 
 이 파일을 수정하고 push하면 GitHub Actions가 자동으로 영어, 일본어, 중국어 번역 파일을 생성합니다.
+
+## 지원 파일 형식
+
+Markdown, 텍스트, JSON, YAML 형식을 모두 지원합니다.
