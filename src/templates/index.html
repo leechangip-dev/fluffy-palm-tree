@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>번역 도구</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Google Sans', 'Noto Sans KR', Arial, sans-serif;
+      background: #f8f9fa;
+      color: #202124;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: #fff;
+      border-bottom: 1px solid #dadce0;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 {
+      font-size: 20px;
+      font-weight: 400;
+      color: #1a73e8;
+    }
+    header .subtitle {
+      font-size: 13px;
+      color: #5f6368;
+    }
+
+    /* ── Main card ── */
+    .card {
+      background: #fff;
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      max-width: 1080px;
+      margin: 24px auto;
+      overflow: hidden;
+    }
+
+    /* ── Language bar ── */
+    .lang-bar {
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid #dadce0;
+      padding: 0;
+    }
+    .lang-side {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0;
+      min-height: 48px;
+    }
+    .lang-side.source-side {
+      padding: 6px 8px 6px 16px;
+    }
+    .lang-side.target-side {
+      padding: 6px 16px 6px 8px;
+    }
+
+    .lang-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #5f6368;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+    .lang-btn:hover { background: #f1f3f4; color: #202124; }
+    .lang-btn.active {
+      color: #1a73e8;
+      border-bottom: 3px solid #1a73e8;
+      border-radius: 0;
+    }
+
+    #source-lang-select {
+      border: none;
+      outline: none;
+      font-size: 14px;
+      font-weight: 500;
+      color: #5f6368;
+      background: transparent;
+      cursor: pointer;
+      padding: 6px 12px;
+      border-radius: 4px;
+    }
+    #source-lang-select:hover { background: #f1f3f4; }
+
+    .swap-btn {
+      flex-shrink: 0;
+      width: 40px;
+      height: 40px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      border-radius: 50%;
+      font-size: 18px;
+      color: #5f6368;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    .swap-btn:hover { background: #f1f3f4; color: #1a73e8; }
+
+    .lang-divider {
+      width: 1px;
+      height: 32px;
+      background: #dadce0;
+      flex-shrink: 0;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid #dadce0;
+      border-radius: 16px;
+      padding: 4px 10px;
+      font-size: 13px;
+      cursor: pointer;
+      background: #fff;
+      color: #5f6368;
+      margin: 3px 4px;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      user-select: none;
+    }
+    .chip:hover { background: #f1f3f4; }
+    .chip.selected {
+      background: #e8f0fe;
+      border-color: #1a73e8;
+      color: #1a73e8;
+      font-weight: 500;
+    }
+    .chip .chip-x {
+      font-size: 16px;
+      line-height: 1;
+      margin-left: 2px;
+      opacity: 0.7;
+    }
+    .chip .chip-x:hover { opacity: 1; }
+
+    /* ── Translation area ── */
+    .translation-area {
+      display: grid;
+      grid-template-columns: 1fr 1px 1fr;
+      min-height: 260px;
+    }
+    .divider-v {
+      background: #dadce0;
+      width: 1px;
+    }
+
+    .text-panel {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+    .text-panel textarea {
+      border: none;
+      outline: none;
+      resize: none;
+      padding: 16px;
+      font-size: 18px;
+      line-height: 1.6;
+      font-family: inherit;
+      background: transparent;
+      flex: 1;
+      min-height: 220px;
+    }
+    #source-text::placeholder { color: #bdc1c6; }
+    #result-text {
+      color: #1a73e8;
+      cursor: default;
+    }
+
+    .panel-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px;
+      border-top: 1px solid #f1f3f4;
+      min-height: 40px;
+    }
+    .char-count { font-size: 12px; color: #9aa0a6; }
+    .icon-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 4px;
+      font-size: 16px;
+      color: #5f6368;
+      transition: background 0.15s;
+    }
+    .icon-btn:hover { background: #f1f3f4; color: #202124; }
+
+    /* Result tabs */
+    .result-tabs {
+      display: flex;
+      border-bottom: 1px solid #f1f3f4;
+      padding: 0 8px;
+    }
+    .result-tab {
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #5f6368;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .result-tab.active { color: #1a73e8; border-bottom-color: #1a73e8; }
+    .result-tab:hover { color: #202124; }
+
+    /* ── Context / notes ── */
+    .context-row {
+      border-top: 1px solid #dadce0;
+      padding: 12px 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .context-row label {
+      font-size: 13px;
+      color: #5f6368;
+      white-space: nowrap;
+      padding-top: 8px;
+    }
+    .context-row textarea {
+      flex: 1;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+      min-height: 52px;
+      transition: border-color 0.15s;
+    }
+    .context-row textarea:focus { border-color: #1a73e8; }
+
+    /* ── Action bar ── */
+    .action-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-top: 1px solid #dadce0;
+      flex-wrap: wrap;
+    }
+    .btn-primary {
+      background: #1a73e8;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 10px 24px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+    .btn-primary:hover { background: #1557b0; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+    .btn-primary:disabled { background: #dadce0; color: #9aa0a6; cursor: not-allowed; box-shadow: none; }
+    .btn-secondary {
+      background: #fff;
+      color: #1a73e8;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      padding: 9px 24px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+    .btn-secondary:hover { background: #f8f9fa; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    .btn-secondary:disabled { color: #9aa0a6; cursor: not-allowed; }
+
+    .quality-check-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #5f6368;
+      cursor: pointer;
+      user-select: none;
+    }
+    .quality-check-label input { cursor: pointer; accent-color: #1a73e8; }
+
+    .shortcut-hint { font-size: 12px; color: #9aa0a6; margin-left: auto; }
+
+    .spinner {
+      display: none;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #dadce0;
+      border-top-color: #1a73e8;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    .spinner.visible { display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Validation panel ── */
+    .validation-panel {
+      border-top: 1px solid #dadce0;
+      padding: 16px;
+      display: none;
+    }
+    .validation-panel.visible { display: block; }
+    .validation-panel h3 {
+      font-size: 14px;
+      font-weight: 500;
+      color: #202124;
+      margin-bottom: 12px;
+    }
+    .val-cards { display: flex; flex-direction: column; gap: 8px; }
+    .val-card {
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      padding: 12px 16px;
+      background: #fff;
+    }
+    .val-card.pass { border-left: 4px solid #34a853; }
+    .val-card.fail { border-left: 4px solid #ea4335; }
+    .val-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .badge.green { background: #e6f4ea; color: #34a853; }
+    .badge.red   { background: #fce8e6; color: #ea4335; }
+    .badge.blue  { background: #e8f0fe; color: #1a73e8; }
+    .badge.orange{ background: #fef7e0; color: #f9ab00; }
+    .val-lang { font-size: 14px; font-weight: 500; color: #202124; }
+    .val-issues { margin-top: 8px; padding-left: 16px; }
+    .val-issues li { font-size: 13px; color: #ea4335; margin: 3px 0; }
+    .val-feedback { font-size: 13px; color: #5f6368; margin-top: 6px; }
+
+    /* ── Error banner ── */
+    .error-banner {
+      display: none;
+      background: #fce8e6;
+      border: 1px solid #f5c6cb;
+      border-radius: 4px;
+      color: #c5221f;
+      padding: 10px 14px;
+      font-size: 13px;
+      margin: 12px 16px 0;
+    }
+    .error-banner.visible { display: block; }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .translation-area { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
+      .divider-v { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="#1a73e8"><path d="M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>
+  <h1>번역 도구</h1>
+  <span class="subtitle">Claude API 기반 자동 번역</span>
+</header>
+
+<main>
+  <div class="card">
+
+    <!-- Language bar -->
+    <div class="lang-bar">
+      <div class="lang-side source-side">
+        <select id="source-lang-select" title="소스 언어 선택">
+          <option value="">자동 감지</option>
+          {% for code, name in languages.items() %}
+          <option value="{{ code }}">{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button class="swap-btn" id="swap-btn" title="언어 교환">⇄</button>
+
+      <div class="lang-divider"></div>
+
+      <div class="lang-side target-side" id="target-chips">
+        <!-- chips rendered by JS -->
+      </div>
+    </div>
+
+    <!-- Error banner -->
+    <div class="error-banner" id="error-banner"></div>
+
+    <!-- Translation area -->
+    <div class="translation-area">
+      <!-- Source -->
+      <div class="text-panel">
+        <textarea id="source-text" placeholder="번역할 내용을 입력하세요..." rows="10" spellcheck="false"></textarea>
+        <div class="panel-footer">
+          <span class="char-count" id="char-count">0</span>
+          <button class="icon-btn" id="clear-btn" title="지우기">✕</button>
+        </div>
+      </div>
+
+      <div class="divider-v"></div>
+
+      <!-- Result -->
+      <div class="text-panel">
+        <div class="result-tabs" id="result-tabs"></div>
+        <textarea id="result-text" readonly placeholder="번역 결과가 여기에 표시됩니다." rows="10"></textarea>
+        <div class="panel-footer">
+          <span></span>
+          <button class="icon-btn" id="copy-btn" title="복사">⎘</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Context / cautions -->
+    <div class="context-row">
+      <label for="context-input">⚠️ 번역 주의사항 / 맥락</label>
+      <textarea
+        id="context-input"
+        rows="2"
+        placeholder="예: 기술 문서입니다. 전문 용어를 유지해주세요. / 친근한 말투로 번역해주세요."
+      ></textarea>
+    </div>
+
+    <!-- Action bar -->
+    <div class="action-bar">
+      <button class="btn-primary" id="translate-btn">번역하기</button>
+      <button class="btn-secondary" id="validate-btn" disabled>검증하기</button>
+      <label class="quality-check-label" title="API 크레딧을 사용합니다">
+        <input type="checkbox" id="quality-check" />
+        품질 점수 확인
+      </label>
+      <span class="spinner" id="spinner"></span>
+      <span class="shortcut-hint">Ctrl+Enter로 번역</span>
+    </div>
+
+    <!-- Validation results -->
+    <div class="validation-panel" id="validation-panel">
+      <h3>검증 결과</h3>
+      <div class="val-cards" id="val-cards"></div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+  const LANGUAGES = {{ languages | tojson }};
+
+  // Default selected target languages
+  const DEFAULT_TARGETS = ['en', 'ja', 'zh'];
+  let selectedTargets = new Set(DEFAULT_TARGETS);
+
+  // Store last translation results: lang -> text
+  let lastResults = {};
+
+  // Active result tab
+  let activeTab = DEFAULT_TARGETS[0];
+
+  // ── Target language chips ──
+  function renderChips() {
+    const container = document.getElementById('target-chips');
+    container.innerHTML = '';
+    for (const [code, name] of Object.entries(LANGUAGES)) {
+      const chip = document.createElement('span');
+      chip.className = 'chip' + (selectedTargets.has(code) ? ' selected' : '');
+      chip.dataset.code = code;
+
+      const label = document.createTextNode(name);
+      chip.appendChild(label);
+
+      if (selectedTargets.has(code)) {
+        const x = document.createElement('span');
+        x.className = 'chip-x';
+        x.textContent = '×';
+        x.addEventListener('click', e => {
+          e.stopPropagation();
+          if (selectedTargets.size > 1) {
+            selectedTargets.delete(code);
+            if (activeTab === code) {
+              activeTab = [...selectedTargets][0];
+            }
+            renderChips();
+            renderResultTabs();
+          }
+        });
+        chip.appendChild(x);
+      }
+
+      chip.addEventListener('click', () => {
+        if (selectedTargets.has(code)) return;
+        selectedTargets.add(code);
+        renderChips();
+        renderResultTabs();
+      });
+
+      container.appendChild(chip);
+    }
+  }
+
+  // ── Result tabs ──
+  function renderResultTabs() {
+    const tabs = document.getElementById('result-tabs');
+    tabs.innerHTML = '';
+    if (selectedTargets.size <= 1) { tabs.style.display = 'none'; return; }
+    tabs.style.display = 'flex';
+
+    for (const code of selectedTargets) {
+      const tab = document.createElement('div');
+      tab.className = 'result-tab' + (activeTab === code ? ' active' : '');
+      tab.textContent = LANGUAGES[code] || code;
+      tab.addEventListener('click', () => {
+        activeTab = code;
+        renderResultTabs();
+        showResult(code);
+      });
+      tabs.appendChild(tab);
+    }
+  }
+
+  function showResult(lang) {
+    const ta = document.getElementById('result-text');
+    ta.value = lastResults[lang] || '';
+  }
+
+  // ── Character count ──
+  document.getElementById('source-text').addEventListener('input', () => {
+    const len = document.getElementById('source-text').value.length;
+    document.getElementById('char-count').textContent = len.toLocaleString();
+  });
+
+  // ── Clear button ──
+  document.getElementById('clear-btn').addEventListener('click', () => {
+    document.getElementById('source-text').value = '';
+    document.getElementById('char-count').textContent = '0';
+    document.getElementById('result-text').value = '';
+    lastResults = {};
+    hideError();
+    document.getElementById('validate-btn').disabled = true;
+    document.getElementById('validation-panel').classList.remove('visible');
+  });
+
+  // ── Copy button ──
+  document.getElementById('copy-btn').addEventListener('click', () => {
+    const text = document.getElementById('result-text').value;
+    if (text) navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('copy-btn');
+      btn.textContent = '✓';
+      setTimeout(() => { btn.textContent = '⎘'; }, 1500);
+    });
+  });
+
+  // ── Swap button ──
+  document.getElementById('swap-btn').addEventListener('click', () => {
+    const sel = document.getElementById('source-lang-select');
+    const resultText = document.getElementById('result-text').value;
+    if (!resultText) return;
+
+    // If active tab lang is in source select, set it; else auto
+    sel.value = activeTab;
+    document.getElementById('source-text').value = resultText;
+    document.getElementById('char-count').textContent = resultText.length.toLocaleString();
+
+    // Remove active tab from targets if it was source
+    const newTargets = new Set(selectedTargets);
+    if (newTargets.has(activeTab)) newTargets.delete(activeTab);
+    // Add old source lang as target if it was set
+    const oldSource = sel.value !== activeTab ? sel.value : '';
+    if (oldSource && oldSource in LANGUAGES) newTargets.add(oldSource);
+    if (newTargets.size === 0) newTargets.add('en');
+    selectedTargets = newTargets;
+    activeTab = [...selectedTargets][0];
+
+    lastResults = {};
+    renderChips();
+    renderResultTabs();
+    document.getElementById('result-text').value = '';
+    document.getElementById('validate-btn').disabled = true;
+    document.getElementById('validation-panel').classList.remove('visible');
+  });
+
+  // ── Error banner ──
+  function showError(msg) {
+    const el = document.getElementById('error-banner');
+    el.textContent = msg;
+    el.classList.add('visible');
+  }
+  function hideError() {
+    document.getElementById('error-banner').classList.remove('visible');
+  }
+
+  // ── Loading ──
+  function setLoading(on) {
+    document.getElementById('spinner').classList.toggle('visible', on);
+    document.getElementById('translate-btn').disabled = on;
+  }
+
+  // ── Translate ──
+  async function doTranslate() {
+    const text = document.getElementById('source-text').value.trim();
+    if (!text) return;
+
+    hideError();
+    setLoading(true);
+    document.getElementById('result-text').value = '';
+    document.getElementById('validate-btn').disabled = true;
+    document.getElementById('validation-panel').classList.remove('visible');
+
+    const sourceLang = document.getElementById('source-lang-select').value || null;
+    const context = document.getElementById('context-input').value.trim() || null;
+    const targetLangs = [...selectedTargets];
+
+    try {
+      const resp = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, target_langs: targetLangs, source_lang: sourceLang, context }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) { showError(data.error || '번역 실패'); return; }
+
+      lastResults = data.results || {};
+      const errEntries = Object.entries(data.errors || {});
+      if (errEntries.length) {
+        showError('일부 언어 번역 실패: ' + errEntries.map(([l, e]) => `${l}: ${e}`).join('; '));
+      }
+
+      // Ensure activeTab is in results, else pick first available
+      if (!lastResults[activeTab]) {
+        activeTab = Object.keys(lastResults)[0] || [...selectedTargets][0];
+      }
+      renderResultTabs();
+      showResult(activeTab);
+      if (Object.keys(lastResults).length > 0) {
+        document.getElementById('validate-btn').disabled = false;
+      }
+    } catch (e) {
+      showError('네트워크 오류: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  document.getElementById('translate-btn').addEventListener('click', doTranslate);
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey && e.key === 'Enter') doTranslate();
+  });
+
+  // ── Validate ──
+  async function doValidate() {
+    const sourceText = document.getElementById('source-text').value.trim();
+    if (!sourceText || Object.keys(lastResults).length === 0) return;
+
+    hideError();
+    setLoading(true);
+    document.getElementById('validation-panel').classList.remove('visible');
+
+    const checkQuality = document.getElementById('quality-check').checked;
+
+    try {
+      const resp = await fetch('/api/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_text: sourceText,
+          translated_texts: lastResults,
+          check_quality: checkQuality,
+        }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) { showError(data.error || '검증 실패'); return; }
+
+      renderValidation(data.results || {});
+    } catch (e) {
+      showError('검증 오류: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  document.getElementById('validate-btn').addEventListener('click', doValidate);
+
+  function renderValidation(results) {
+    const panel = document.getElementById('validation-panel');
+    const cards = document.getElementById('val-cards');
+    cards.innerHTML = '';
+
+    for (const [lang, r] of Object.entries(results)) {
+      const card = document.createElement('div');
+      card.className = 'val-card ' + (r.passed ? 'pass' : 'fail');
+
+      const header = document.createElement('div');
+      header.className = 'val-header';
+
+      const langLabel = document.createElement('span');
+      langLabel.className = 'val-lang';
+      langLabel.textContent = (LANGUAGES[lang] || lang) + ` (${lang})`;
+      header.appendChild(langLabel);
+
+      // Completeness badge
+      const cb = document.createElement('span');
+      cb.className = 'badge ' + (r.complete ? 'green' : 'red');
+      cb.textContent = r.complete ? '✅ 완전성 통과' : `❌ ${r.issues.length}개 문제`;
+      header.appendChild(cb);
+
+      // Quality badge
+      if (r.quality_score !== null && r.quality_score !== undefined) {
+        const qb = document.createElement('span');
+        qb.className = 'badge ' + (r.quality_score >= 7 ? 'blue' : 'orange');
+        qb.textContent = `품질 ${r.quality_score.toFixed(1)}/10`;
+        header.appendChild(qb);
+      }
+
+      card.appendChild(header);
+
+      if (r.issues && r.issues.length > 0) {
+        const ul = document.createElement('ul');
+        ul.className = 'val-issues';
+        r.issues.forEach(issue => {
+          const li = document.createElement('li');
+          li.textContent = issue;
+          ul.appendChild(li);
+        });
+        card.appendChild(ul);
+      }
+
+      if (r.quality_feedback) {
+        const fb = document.createElement('div');
+        fb.className = 'val-feedback';
+        fb.textContent = '피드백: ' + r.quality_feedback;
+        card.appendChild(fb);
+      }
+
+      cards.appendChild(card);
+    }
+
+    panel.classList.add('visible');
+  }
+
+  // ── Init ──
+  renderChips();
+  renderResultTabs();
+</script>
+</body>
+</html>
