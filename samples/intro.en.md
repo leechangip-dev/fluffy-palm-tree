@@ -32,14 +32,14 @@ When you modify this file and push it, GitHub Actions will automatically generat
 
 ## Supported File Formats
 
-Supports Markdown, text, JSON, and YAML formats.
+Markdown, text, JSON, and YAML formats are all supported.
 
 ## Benefits of Automation
 
-Automating repetitive translation tasks can save time and costs. When integrated with GitHub Actions, translation is executed immediately upon file modification.
+Automating repetitive translation tasks can save time and costs. When integrated with GitHub Actions, translation and verification are executed immediately upon file modification.
 
 ## Cautions
 
 - Manage your API key as a GitHub Secret to prevent it from being exposed externally.
-- Do not manually edit translation output files (`.en.md`, `.ja.md`, etc.). They will be automatically overwritten when the source file is modified.
+- Do not manually edit translated output files (`.en.md`, `.ja.md`, etc.). They will be automatically overwritten when the source file is modified.
 - Large files may take time to translate.
