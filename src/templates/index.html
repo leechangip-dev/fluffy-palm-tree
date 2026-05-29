@@ -362,6 +362,137 @@
       padding: 12px 16px; border-top: 1px solid #dadce0; flex-wrap: wrap;
     }
 
+    /* ── Patent verification tab ── */
+    #patent-mode { display: none; }
+    #patent-mode.visible { display: block; }
+
+    .patent-dropzone {
+      margin: 20px 16px 0;
+      border: 2px dashed #dadce0; border-radius: 8px;
+      padding: 32px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      background: #fafafa;
+    }
+    .patent-dropzone:hover, .patent-dropzone.drag-over {
+      border-color: #1a73e8; background: #e8f0fe;
+    }
+    .patent-dropzone .drop-icon { font-size: 36px; margin-bottom: 8px; }
+    .patent-dropzone .drop-title { font-size: 15px; font-weight: 500; color: #202124; }
+    .patent-dropzone .drop-hint { font-size: 12px; color: #9aa0a6; margin-top: 4px; }
+
+    .patent-file-list {
+      margin: 12px 16px 0;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .patent-file-item {
+      display: flex; align-items: center; gap: 10px;
+      border: 1px solid #dadce0; border-radius: 6px;
+      padding: 8px 12px; background: #fff;
+    }
+    .patent-file-icon { font-size: 18px; flex-shrink: 0; }
+    .patent-file-name { flex: 1; font-size: 13px; color: #202124; word-break: break-all; }
+    .patent-file-size { font-size: 11px; color: #9aa0a6; flex-shrink: 0; }
+    .patent-file-role select {
+      border: 1px solid #dadce0; border-radius: 4px;
+      padding: 4px 8px; font-size: 12px; color: #202124;
+      background: #fff; cursor: pointer; outline: none;
+    }
+    .patent-file-role select:focus { border-color: #1a73e8; }
+    .patent-file-remove {
+      background: none; border: none; cursor: pointer;
+      color: #9aa0a6; font-size: 16px; flex-shrink: 0;
+      transition: color .15s;
+    }
+    .patent-file-remove:hover { color: #ea4335; }
+
+    .patent-action-bar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; border-top: 1px solid #dadce0;
+      margin-top: 16px; flex-wrap: wrap;
+    }
+    .patent-error-banner {
+      display: none;
+      background: #fce8e6; border: 1px solid #f5c6cb;
+      border-radius: 4px; color: #c5221f;
+      padding: 10px 14px; font-size: 13px;
+      margin: 8px 16px 0;
+    }
+    .patent-error-banner.visible { display: block; }
+
+    .patent-results { padding: 0 16px 16px; }
+    .patent-summary {
+      background: #e8f0fe; border-radius: 6px;
+      padding: 12px 16px; font-size: 13px; color: #1a73e8;
+      margin-bottom: 16px; line-height: 1.5;
+    }
+
+    .patent-section-title {
+      font-size: 14px; font-weight: 600; color: #202124;
+      padding: 12px 0 8px;
+      border-bottom: 2px solid #dadce0; margin-bottom: 10px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .patent-count-badge {
+      font-size: 12px; font-weight: 500; background: #f1f3f4;
+      color: #5f6368; padding: 2px 8px; border-radius: 10px;
+    }
+
+    .correction-card {
+      border: 1px solid #dadce0; border-radius: 8px;
+      margin-bottom: 10px; overflow: hidden;
+      background: #fff;
+    }
+    .correction-card.sev-심각 { border-left: 4px solid #ea4335; }
+    .correction-card.sev-보통  { border-left: 4px solid #f9ab00; }
+    .correction-card.sev-경미  { border-left: 4px solid #34a853; }
+
+    .correction-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px 6px; flex-wrap: wrap;
+    }
+    .sev-badge {
+      font-size: 11px; font-weight: 700;
+      padding: 2px 8px; border-radius: 10px;
+    }
+    .sev-badge.심각 { background: #fce8e6; color: #c5221f; }
+    .sev-badge.보통  { background: #fef7e0; color: #b06000; }
+    .sev-badge.경미  { background: #e6f4ea; color: #1e7e34; }
+    .correction-location { font-size: 12px; color: #5f6368; }
+
+    .correction-body { padding: 6px 14px 12px; }
+    .correction-row {
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      gap: 4px 10px;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+    .correction-row .lbl { color: #9aa0a6; font-size: 11px; font-weight: 600; padding-top: 2px; text-transform: uppercase; }
+    .correction-row .jp  { color: #202124; line-height: 1.5; }
+    .correction-row .old { color: #ea4335; line-height: 1.5; text-decoration: line-through; opacity: .8; }
+    .correction-row .new { color: #34a853; line-height: 1.5; font-weight: 500; }
+    .correction-row .why { color: #5f6368; line-height: 1.5; font-style: italic; }
+
+    .ser-card {
+      border: 1px solid #dadce0; border-radius: 8px;
+      margin-bottom: 10px; padding: 10px 14px;
+      background: #fff;
+    }
+    .ser-card.ser-required { border-left: 4px solid #ea4335; }
+    .ser-card.ser-note-only { border-left: 4px solid #f9ab00; }
+    .ser-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+    .ser-badge {
+      font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+    }
+    .ser-badge.required { background: #fce8e6; color: #c5221f; }
+    .ser-badge.info     { background: #fef7e0; color: #b06000; }
+    .ser-location { font-size: 12px; color: #5f6368; }
+    .ser-text { font-size: 13px; color: #202124; margin-bottom: 4px; font-style: italic; }
+    .ser-issue { font-size: 13px; color: #5f6368; }
+    .ser-note-text { font-size: 12px; color: #ea4335; margin-top: 4px; }
+
     /* ── Responsive ── */
     @media (max-width: 640px) {
       .translation-area { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
@@ -385,6 +516,7 @@
     <div class="mode-tabs">
       <div class="mode-tab active" id="tab-translate" onclick="switchMode('translate')">🔤 번역</div>
       <div class="mode-tab" id="tab-validate" onclick="switchMode('validate')">✅ 번역물 검증</div>
+      <div class="mode-tab" id="tab-patent" onclick="switchMode('patent')">📋 특허 번역 검증</div>
     </div>
 
     <!-- ══════════ TRANSLATE MODE ══════════ -->
@@ -507,6 +639,58 @@
 
     </div><!-- /validate-mode -->
 
+
+    <!-- ══════════ PATENT MODE ══════════ -->
+    <div id="patent-mode">
+
+      <!-- Drop zone -->
+      <div class="patent-dropzone" id="patent-dropzone"
+           onclick="document.getElementById('patent-file-input').click()">
+        <div class="drop-icon">📂</div>
+        <div class="drop-title">파일을 드래그&드롭 또는 클릭하여 선택</div>
+        <div class="drop-hint">일본어 원문 · 영어 번역문 · 번역자 메모 (.txt .md 지원, 여러 파일 동시 선택 가능)</div>
+      </div>
+      <input type="file" id="patent-file-input" multiple accept=".txt,.md"
+             style="display:none" onchange="handlePatentFiles(this.files)">
+
+      <!-- File list -->
+      <div class="patent-file-list" id="patent-file-list"></div>
+
+      <!-- Error -->
+      <div class="patent-error-banner" id="patent-error-banner"></div>
+
+      <!-- Action bar -->
+      <div class="patent-action-bar">
+        <button class="btn-primary" id="patent-verify-btn" onclick="doPatentVerify()">검증 시작</button>
+        <button class="btn-stop" id="patent-stop-btn" onclick="doPatentStop()">■ 중지</button>
+        <span class="spinner" id="patent-spinner"></span>
+        <span style="font-size:12px;color:#9aa0a6;">원문(JP) + 번역문(EN) 파일이 필요합니다</span>
+      </div>
+
+      <!-- Results -->
+      <div id="patent-results" class="patent-results" style="display:none">
+        <div class="patent-summary" id="patent-summary"></div>
+
+        <div id="patent-corrections-section">
+          <div class="patent-section-title">
+            ✏️ 수정 제안
+            <span class="patent-count-badge" id="corrections-count">0건</span>
+          </div>
+          <div id="patent-correction-cards"></div>
+        </div>
+
+        <div id="patent-errors-section">
+          <div class="patent-section-title">
+            ⚠️ 원문 오류
+            <span class="patent-count-badge" id="errors-count">0건</span>
+          </div>
+          <div id="patent-error-cards"></div>
+        </div>
+      </div>
+
+    </div><!-- /patent-mode -->
+
+
   </div>
 </main>
 
@@ -520,10 +704,12 @@
 
   // ── Mode switch ──
   function switchMode(mode) {
-    document.getElementById('tab-translate').classList.toggle('active', mode === 'translate');
-    document.getElementById('tab-validate').classList.toggle('active', mode === 'validate');
+    ['translate','validate','patent'].forEach(m => {
+      document.getElementById('tab-' + m).classList.toggle('active', m === mode);
+    });
     document.getElementById('translate-mode').classList.toggle('hidden', mode !== 'translate');
     document.getElementById('validate-mode').classList.toggle('visible', mode === 'validate');
+    document.getElementById('patent-mode').classList.toggle('visible', mode === 'patent');
   }
 
   // ── Stop (translate mode) ──
@@ -864,6 +1050,236 @@
       cards.appendChild(card);
     }
     document.getElementById(panelId).classList.add('visible');
+  }
+
+  // ══════════════════════════════════════════════════
+  // PATENT VERIFICATION MODE
+  // ══════════════════════════════════════════════════
+
+  // patentFiles: array of { file: File, role: 'source'|'translation'|'notes'|'ignore', text: string }
+  let patentFiles = [];
+
+  function hasJapanese(text) {
+    return /[぀-ヿ一-鿿]/.test(text.slice(0, 500));
+  }
+  function guessRole(file, text) {
+    const n = file.name.toLowerCase();
+    if (/\bjp\b|japan|原文|原稿/.test(n)) return 'source';
+    if (/\ben\b|english|訳文|translation/.test(n)) return 'translation';
+    if (/note|memo|コメント|메모/.test(n)) return 'notes';
+    // detect by content
+    if (hasJapanese(text)) return 'source';
+    if (/[a-zA-Z]/.test(text.slice(0, 200)) && !hasJapanese(text)) return 'translation';
+    return 'ignore';
+  }
+
+  function readFile(file) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = e => res(e.target.result);
+      r.onerror = rej;
+      r.readAsText(file, 'utf-8');
+    });
+  }
+
+  async function handlePatentFiles(fileList) {
+    for (const file of fileList) {
+      if (patentFiles.find(f => f.file.name === file.name)) continue;
+      const text = await readFile(file);
+      const role = guessRole(file, text);
+      patentFiles.push({ file, role, text });
+    }
+    renderPatentFileList();
+  }
+
+  function renderPatentFileList() {
+    const list = document.getElementById('patent-file-list');
+    list.innerHTML = '';
+    patentFiles.forEach((entry, idx) => {
+      const item = document.createElement('div');
+      item.className = 'patent-file-item';
+
+      const icon = document.createElement('span');
+      icon.className = 'patent-file-icon';
+      icon.textContent = entry.role === 'source' ? '🇯🇵' :
+                         entry.role === 'translation' ? '🇺🇸' :
+                         entry.role === 'notes' ? '📝' : '📄';
+
+      const name = document.createElement('span');
+      name.className = 'patent-file-name';
+      name.textContent = entry.file.name;
+
+      const size = document.createElement('span');
+      size.className = 'patent-file-size';
+      size.textContent = (entry.file.size / 1024).toFixed(1) + ' KB';
+
+      const roleWrap = document.createElement('div');
+      roleWrap.className = 'patent-file-role';
+      const sel = document.createElement('select');
+      [
+        ['source',      '🇯🇵 원문 (JP)'],
+        ['translation', '🇺🇸 번역문 (EN)'],
+        ['notes',       '📝 번역자 메모'],
+        ['ignore',      '— 제외'],
+      ].forEach(([val, lbl]) => {
+        const opt = document.createElement('option');
+        opt.value = val; opt.textContent = lbl;
+        if (val === entry.role) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.onchange = () => {
+        patentFiles[idx].role = sel.value;
+        renderPatentFileList();
+      };
+      roleWrap.appendChild(sel);
+
+      const rm = document.createElement('button');
+      rm.className = 'patent-file-remove'; rm.textContent = '×';
+      rm.onclick = () => { patentFiles.splice(idx, 1); renderPatentFileList(); };
+
+      item.append(icon, name, size, roleWrap, rm);
+      list.appendChild(item);
+    });
+  }
+
+  // Drag & drop for the patent dropzone
+  (function setupPatentDrop() {
+    const zone = document.getElementById('patent-dropzone');
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault(); zone.classList.remove('drag-over');
+      handlePatentFiles(e.dataTransfer.files);
+    });
+  })();
+
+  function setPatentLoading(on) {
+    document.getElementById('patent-spinner').classList.toggle('visible', on);
+    document.getElementById('patent-verify-btn').disabled = on;
+    document.getElementById('patent-stop-btn').classList.toggle('visible', on);
+  }
+  function showPatentError(msg) {
+    const el = document.getElementById('patent-error-banner');
+    el.textContent = msg; el.classList.add('visible');
+  }
+  function hidePatentError() {
+    document.getElementById('patent-error-banner').classList.remove('visible');
+  }
+  function doPatentStop() {
+    if (currentController) { currentController.abort(); currentController = null; }
+    setPatentLoading(false);
+  }
+
+  async function doPatentVerify() {
+    hidePatentError();
+    const src  = patentFiles.find(f => f.role === 'source');
+    const trl  = patentFiles.find(f => f.role === 'translation');
+    const note = patentFiles.find(f => f.role === 'notes');
+    if (!src)  { showPatentError('원문(JP) 파일을 추가해 주세요.'); return; }
+    if (!trl)  { showPatentError('번역문(EN) 파일을 추가해 주세요.'); return; }
+
+    if (currentController) currentController.abort();
+    currentController = new AbortController();
+    setPatentLoading(true);
+    document.getElementById('patent-results').style.display = 'none';
+
+    try {
+      const resp = await fetch('/api/patent-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_text: src.text,
+          translation_text: trl.text,
+          notes_text: note ? note.text : '',
+        }),
+        signal: currentController.signal,
+      });
+      const data = await resp.json();
+      if (!resp.ok || data.error) { showPatentError(data.error || '검증 실패'); return; }
+      renderPatentResults(data);
+    } catch (e) {
+      if (e.name !== 'AbortError') showPatentError('오류: ' + e.message);
+    } finally {
+      setPatentLoading(false);
+      currentController = null;
+    }
+  }
+
+  function renderPatentResults(data) {
+    const corrections = data.corrections || [];
+    const sourceErrors = data.source_errors || [];
+
+    // Summary
+    document.getElementById('patent-summary').textContent = data.summary || '';
+
+    // Corrections
+    document.getElementById('corrections-count').textContent = corrections.length + '건';
+    const ccards = document.getElementById('patent-correction-cards');
+    ccards.innerHTML = '';
+    if (corrections.length === 0) {
+      ccards.innerHTML = '<p style="font-size:13px;color:#34a853;padding:8px 0">✅ 수정 제안 없음</p>';
+    } else {
+      corrections.forEach(c => {
+        const sev = c.severity || '경미';
+        const card = document.createElement('div');
+        card.className = `correction-card sev-${sev}`;
+
+        card.innerHTML = `
+          <div class="correction-header">
+            <span class="sev-badge ${sev}">${sev}</span>
+            <span class="correction-location">${esc(c.location || '')}</span>
+          </div>
+          <div class="correction-body">
+            <div class="correction-row">
+              <span class="lbl">원문(JP)</span>
+              <span class="jp">${esc(c.original_jp || '')}</span>
+            </div>
+            <div class="correction-row">
+              <span class="lbl">기존 번역</span>
+              <span class="old">${esc(c.existing_en || '')}</span>
+            </div>
+            <div class="correction-row">
+              <span class="lbl">수정 번역</span>
+              <span class="new">${esc(c.corrected_en || '')}</span>
+            </div>
+            <div class="correction-row">
+              <span class="lbl">이유</span>
+              <span class="why">${esc(c.reason || '')}</span>
+            </div>
+          </div>`;
+        ccards.appendChild(card);
+      });
+    }
+
+    // Source errors
+    document.getElementById('errors-count').textContent = sourceErrors.length + '건';
+    const ecards = document.getElementById('patent-error-cards');
+    ecards.innerHTML = '';
+    if (sourceErrors.length === 0) {
+      ecards.innerHTML = '<p style="font-size:13px;color:#34a853;padding:8px 0">✅ 원문 오류 없음</p>';
+    } else {
+      sourceErrors.forEach(e => {
+        const card = document.createElement('div');
+        card.className = 'ser-card ' + (e.ser_required ? 'ser-required' : 'ser-note-only');
+        card.innerHTML = `
+          <div class="ser-header">
+            <span class="ser-badge ${e.ser_required ? 'required' : 'info'}">${e.ser_required ? 'SER 필요' : '참고'}</span>
+            <span class="ser-location">${esc(e.location || '')}</span>
+          </div>
+          <div class="ser-text">${esc(e.text || '')}</div>
+          <div class="ser-issue">${esc(e.issue || '')}</div>
+          ${e.ser_note ? `<div class="ser-note-text">SER: ${esc(e.ser_note)}</div>` : ''}`;
+        ecards.appendChild(card);
+      });
+    }
+
+    document.getElementById('patent-results').style.display = 'block';
+  }
+
+  function esc(str) {
+    return String(str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
   // ── Context file drag & drop ──

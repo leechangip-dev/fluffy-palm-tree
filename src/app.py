@@ -137,6 +137,94 @@ def api_detect():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/patent-verify", methods=["POST"])
+def api_patent_verify():
+    data = request.get_json(force=True)
+    source_text: str = data.get("source_text", "").strip()      # Japanese
+    translation_text: str = data.get("translation_text", "").strip()  # English
+    notes_text: str = data.get("notes_text", "").strip()         # Translator notes (optional)
+
+    if not source_text:
+        return jsonify({"error": "원문(일본어) 텍스트가 필요합니다."}), 400
+    if not translation_text:
+        return jsonify({"error": "번역문(영어) 텍스트가 필요합니다."}), 400
+
+    try:
+        translator = _get_translator()
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 500
+
+    notes_block = f"\n\n[번역자 메모]\n{notes_text[:2000]}" if notes_text else ""
+
+    prompt = f"""You are a professional patent translation verifier specializing in PCT applications (Japanese → English).
+
+Verify the following translation sentence-by-sentence, ensuring:
+1. Strict literal fidelity to the original Japanese — do NOT smooth for fluency
+2. Accurate rendering of technical/legal patent terminology
+3. Patent-style conventions: articles (a/an/the) in claims, standard claim language
+   ("comprising", "wherein", "configured to", "connected to", etc.)
+4. Consistency of terminology throughout the entire document
+5. Detection of rephrasing, omissions, additions, or paraphrasing
+6. Grammar and syntactic correctness
+7. Translator notes (if provided): accuracy, appropriateness, completeness
+
+Skip sentences/paragraphs with NO issues entirely.
+Results must be explained in Korean.
+
+Return ONLY a JSON object with this exact structure (no other text):
+{{
+  "corrections": [
+    {{
+      "location": "단락·문장 위치 (예: 청구항1, 발명의 상세한 설명 3단락 등)",
+      "original_jp": "원문 일본어",
+      "existing_en": "기존 영어 번역",
+      "corrected_en": "수정 영어 번역",
+      "reason": "수정 이유 (한국어)",
+      "severity": "심각"
+    }}
+  ],
+  "source_errors": [
+    {{
+      "location": "위치",
+      "text": "오류 원문",
+      "issue": "오류 내용 (한국어)",
+      "ser_required": true,
+      "ser_note": "SER 기재 내용 (한국어)"
+    }}
+  ],
+  "summary": "전체 검증 요약 2-3문장 (한국어)"
+}}
+
+severity 값은 반드시 "심각", "보통", "경미" 중 하나.
+
+[원문 (일본어)]
+{source_text[:5000]}
+
+[번역문 (영어)]
+{translation_text[:5000]}{notes_block}"""
+
+    import re as _re
+    raw = translator._call_api(
+        system=[{
+            "type": "text",
+            "text": (
+                "You are a senior patent translation verifier with expertise in "
+                "Japanese PCT applications and US/EP patent drafting conventions. "
+                "Respond only with the requested JSON object."
+            ),
+            "cache_control": {"type": "ephemeral"},
+        }],
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    try:
+        match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+        result = json.loads(match.group() if match else raw)
+        return jsonify(result)
+    except Exception:
+        return jsonify({"error": f"응답 파싱 오류: {raw[:300]}"}), 500
+
+
 @app.route("/api/langs")
 def api_langs():
     return jsonify(SUPPORTED_LANGUAGES)
