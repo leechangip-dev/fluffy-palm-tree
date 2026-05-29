@@ -27,26 +27,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Debug info
-        run: |
-          echo "=== Python version ==="
-          python --version
-          echo "=== Anthropic installed ==="
-          pip show anthropic | head -3
-          echo "=== API key set ==="
-          if [ -n "$ANTHROPIC_API_KEY" ]; then echo "YES"; else echo "NO — secret missing!"; fi
-          echo "=== Changed files ==="
-          git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" || echo "(diff failed)"
-          echo "=== Repo structure ==="
-          ls -la
-          ls -la src/
-          ls -la samples/
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-
-      - name: Translate changed source files
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      - name: Find changed source files
+        id: detect
         run: |
           BEFORE="${{ github.event.before }}"
 
@@ -57,19 +39,34 @@ jobs:
           fi
 
           echo "번역 대상: ${CHANGED:-없음}"
+          FILES=$(echo "$CHANGED" | tr '\n' ' ' | xargs)
+          echo "files=$FILES" >> "$GITHUB_OUTPUT"
 
-          if [ -z "$CHANGED" ]; then
-            echo "번역할 파일 없음 — 종료"
-            exit 0
-          fi
-
-          for file in $CHANGED; do
+      - name: Translate
+        if: steps.detect.outputs.files != ''
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          for file in ${{ steps.detect.outputs.files }}; do
             [ -f "$file" ] || continue
             echo "=== 번역: $file ==="
             python src/cli.py file "$file" -t en,ja,zh --delay 0.5
           done
 
+      - name: Validate translations
+        if: steps.detect.outputs.files != ''
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          for file in ${{ steps.detect.outputs.files }}; do
+            [ -f "$file" ] || continue
+            echo ""
+            echo "=== 검증: $file ==="
+            python src/cli.py validate "$file" -t en,ja,zh
+          done
+
       - name: Commit translations
+        if: steps.detect.outputs.files != ''
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

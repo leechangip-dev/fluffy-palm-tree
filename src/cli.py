@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from translator import SUPPORTED_LANGUAGES, Translator
+from validator import TranslationValidator
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -38,6 +39,23 @@ def build_parser() -> argparse.ArgumentParser:
     file_parser.add_argument(
         "--delay", type=float, default=0.5,
         help="Delay (seconds) between API calls in batch mode (default: 0.5)",
+    )
+
+    # validate translations
+    validate_parser = subparsers.add_parser("validate", help="Validate translated files")
+    validate_parser.add_argument("input", help="Source file path")
+    validate_parser.add_argument(
+        "-t", "--to", required=True,
+        help="Target language code(s) to validate, comma-separated (e.g. en,ja,zh)",
+    )
+    validate_parser.add_argument("-f", "--from", dest="from_lang", help="Source language code")
+    validate_parser.add_argument(
+        "--quality", action="store_true",
+        help="Run quality check via Claude API (uses API credits)",
+    )
+    validate_parser.add_argument(
+        "--fail-on-issues", action="store_true",
+        help="Exit with code 1 if any validation issues found",
     )
 
     # detect language of a file or text
@@ -110,6 +128,40 @@ def cmd_file(args, translator: Translator) -> None:
             print(f"[{lang}] Saved: {path}")
 
 
+def cmd_validate(args, translator: Translator) -> None:
+    input_path = Path(args.input)
+    if not input_path.exists():
+        print(f"Error: file not found: {input_path}", file=sys.stderr)
+        sys.exit(1)
+
+    target_langs = [lang.strip() for lang in args.to.split(",")]
+    validator = TranslationValidator(translator if args.quality else None)
+
+    print(f"\n검증 대상: {input_path.name} → {', '.join(target_langs)}")
+    print("=" * 50)
+
+    results = validator.validate_batch(
+        input_path,
+        target_langs,
+        check_quality=args.quality,
+        source_lang=args.from_lang,
+    )
+
+    has_issues = False
+    for result in results:
+        print(result.summary())
+        if not result.passed:
+            has_issues = True
+
+    print("=" * 50)
+    if has_issues:
+        print("⚠️  검증 문제 발견")
+        if args.fail_on_issues:
+            sys.exit(1)
+    else:
+        print("✅ 모든 검증 통과")
+
+
 def cmd_detect(args, translator: Translator) -> None:
     path = Path(args.input)
     if path.exists():
@@ -144,9 +196,12 @@ def main() -> None:
         cmd_text(args, translator)
     elif args.command == "file":
         cmd_file(args, translator)
+    elif args.command == "validate":
+        cmd_validate(args, translator)
     elif args.command == "detect":
         cmd_detect(args, translator)
 
 
 if __name__ == "__main__":
     main()
+
