@@ -2,6 +2,7 @@
 
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
@@ -59,11 +60,17 @@ def api_translate():
     results: dict[str, str] = {}
     errors: dict[str, str] = {}
 
-    for lang in target_langs:
-        try:
-            results[lang] = translator.translate(text, lang, source_lang, context)
-        except Exception as e:
-            errors[lang] = str(e)
+    def _translate_one(lang: str):
+        return lang, translator.translate(text, lang, source_lang, context)
+
+    with ThreadPoolExecutor(max_workers=len(target_langs)) as pool:
+        futures = {pool.submit(_translate_one, lang): lang for lang in target_langs}
+        for future in as_completed(futures):
+            try:
+                lang, translated = future.result()
+                results[lang] = translated
+            except Exception as e:
+                errors[futures[future]] = str(e)
 
     return jsonify({"results": results, "errors": errors})
 

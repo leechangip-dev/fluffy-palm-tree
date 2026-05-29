@@ -4,6 +4,7 @@ import anthropic
 import hashlib
 import json
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -269,27 +270,32 @@ class Translator:
         output_dir: Optional[Path] = None,
         source_lang: Optional[str] = None,
         context: Optional[str] = None,
-        delay: float = 0.5,
+        delay: float = 0.0,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
     ) -> dict[str, Path]:
         base_dir = output_dir or input_path.parent
         suffix = input_path.suffix.lower()
         total = len(target_langs)
         results: dict[str, Path] = {}
+        completed = [0]
 
-        for i, lang in enumerate(target_langs, 1):
-            if progress_callback:
-                progress_callback(i, total, lang)
-
+        def _translate_one(lang: str) -> tuple[str, Path]:
             stem = input_path.stem
-            if suffix == ".json":
-                out_path = base_dir / f"{stem}.{lang}.json"
-            else:
-                out_path = base_dir / f"{stem}.{lang}{suffix}"
+            out_path = (
+                base_dir / f"{stem}.{lang}.json"
+                if suffix == ".json"
+                else base_dir / f"{stem}.{lang}{suffix}"
+            )
+            path = self.translate_file(input_path, lang, out_path, source_lang, context)
+            completed[0] += 1
+            if progress_callback:
+                progress_callback(completed[0], total, lang)
+            return lang, path
 
-            results[lang] = self.translate_file(input_path, lang, out_path, source_lang, context)
-
-            if delay > 0 and i < total:
-                time.sleep(delay)
+        with ThreadPoolExecutor(max_workers=min(len(target_langs), 5)) as pool:
+            futures = [pool.submit(_translate_one, lang) for lang in target_langs]
+            for future in as_completed(futures):
+                lang, path = future.result()
+                results[lang] = path
 
         return results
