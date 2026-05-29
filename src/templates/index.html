@@ -23,17 +23,10 @@
       align-items: center;
       gap: 12px;
     }
-    header h1 {
-      font-size: 20px;
-      font-weight: 400;
-      color: #1a73e8;
-    }
-    header .subtitle {
-      font-size: 13px;
-      color: #5f6368;
-    }
+    header h1 { font-size: 20px; font-weight: 400; color: #1a73e8; }
+    header .subtitle { font-size: 13px; color: #5f6368; }
 
-    /* ── Main card ── */
+    /* ── Card ── */
     .card {
       background: #fff;
       border: 1px solid #dadce0;
@@ -43,112 +36,72 @@
       overflow: hidden;
     }
 
+    /* ── Mode tabs ── */
+    .mode-tabs {
+      display: flex;
+      border-bottom: 1px solid #dadce0;
+      background: #f8f9fa;
+    }
+    .mode-tab {
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #5f6368;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: color .15s, border-color .15s, background .15s;
+    }
+    .mode-tab:hover { background: #f1f3f4; color: #202124; }
+    .mode-tab.active { color: #1a73e8; border-bottom-color: #1a73e8; background: #fff; }
+
     /* ── Language bar ── */
     .lang-bar {
       display: flex;
       align-items: center;
       border-bottom: 1px solid #dadce0;
-      padding: 0;
     }
     .lang-side {
       flex: 1;
       display: flex;
       align-items: center;
       flex-wrap: wrap;
-      gap: 0;
       min-height: 48px;
     }
-    .lang-side.source-side {
-      padding: 6px 8px 6px 16px;
-    }
-    .lang-side.target-side {
-      padding: 6px 16px 6px 8px;
-    }
-
-    .lang-btn {
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 6px 12px;
-      border-radius: 4px;
-      font-size: 14px;
-      font-weight: 500;
-      color: #5f6368;
-      transition: background 0.15s, color 0.15s;
-      white-space: nowrap;
-    }
-    .lang-btn:hover { background: #f1f3f4; color: #202124; }
-    .lang-btn.active {
-      color: #1a73e8;
-      border-bottom: 3px solid #1a73e8;
-      border-radius: 0;
-    }
+    .lang-side.source-side { padding: 6px 8px 6px 16px; }
+    .lang-side.target-side { padding: 6px 16px 6px 8px; }
 
     #source-lang-select {
-      border: none;
-      outline: none;
-      font-size: 14px;
-      font-weight: 500;
-      color: #5f6368;
-      background: transparent;
-      cursor: pointer;
-      padding: 6px 12px;
-      border-radius: 4px;
+      border: none; outline: none;
+      font-size: 14px; font-weight: 500; color: #5f6368;
+      background: transparent; cursor: pointer;
+      padding: 6px 12px; border-radius: 4px;
     }
     #source-lang-select:hover { background: #f1f3f4; }
 
     .swap-btn {
       flex-shrink: 0;
-      width: 40px;
-      height: 40px;
-      border: none;
-      background: none;
-      cursor: pointer;
-      border-radius: 50%;
-      font-size: 18px;
-      color: #5f6368;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.15s, color 0.15s;
+      width: 40px; height: 40px;
+      border: none; background: none; cursor: pointer;
+      border-radius: 50%; font-size: 18px; color: #5f6368;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s, color .15s;
     }
     .swap-btn:hover { background: #f1f3f4; color: #1a73e8; }
 
-    .lang-divider {
-      width: 1px;
-      height: 32px;
-      background: #dadce0;
-      flex-shrink: 0;
-    }
+    .lang-divider { width: 1px; height: 32px; background: #dadce0; flex-shrink: 0; }
 
     .chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      border: 1px solid #dadce0;
-      border-radius: 16px;
-      padding: 4px 10px;
-      font-size: 13px;
-      cursor: pointer;
-      background: #fff;
-      color: #5f6368;
+      display: inline-flex; align-items: center; gap: 4px;
+      border: 1px solid #dadce0; border-radius: 16px;
+      padding: 4px 10px; font-size: 13px; cursor: pointer;
+      background: #fff; color: #5f6368;
       margin: 3px 4px;
-      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      transition: background .15s, border-color .15s, color .15s;
       user-select: none;
     }
     .chip:hover { background: #f1f3f4; }
-    .chip.selected {
-      background: #e8f0fe;
-      border-color: #1a73e8;
-      color: #1a73e8;
-      font-weight: 500;
-    }
-    .chip .chip-x {
-      font-size: 16px;
-      line-height: 1;
-      margin-left: 2px;
-      opacity: 0.7;
-    }
+    .chip.selected { background: #e8f0fe; border-color: #1a73e8; color: #1a73e8; font-weight: 500; }
+    .chip .chip-x { font-size: 16px; line-height: 1; margin-left: 2px; opacity: .7; }
     .chip .chip-x:hover { opacity: 1; }
 
     /* ── Translation area ── */
@@ -157,220 +110,263 @@
       grid-template-columns: 1fr 1px 1fr;
       min-height: 260px;
     }
-    .divider-v {
-      background: #dadce0;
-      width: 1px;
-    }
+    .divider-v { background: #dadce0; }
 
-    .text-panel {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-    }
+    .text-panel { position: relative; display: flex; flex-direction: column; }
     .text-panel textarea {
-      border: none;
-      outline: none;
-      resize: none;
-      padding: 16px;
-      font-size: 18px;
-      line-height: 1.6;
-      font-family: inherit;
-      background: transparent;
-      flex: 1;
-      min-height: 220px;
+      border: none; outline: none; resize: none;
+      padding: 16px; font-size: 18px; line-height: 1.6;
+      font-family: inherit; background: transparent;
+      flex: 1; min-height: 220px;
     }
     #source-text::placeholder { color: #bdc1c6; }
-    #result-text {
-      color: #1a73e8;
-      cursor: default;
-    }
+    #result-text { color: #1a73e8; cursor: default; }
 
     .panel-footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 6px 12px;
-      border-top: 1px solid #f1f3f4;
-      min-height: 40px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 12px; border-top: 1px solid #f1f3f4; min-height: 40px;
     }
     .char-count { font-size: 12px; color: #9aa0a6; }
+
     .icon-btn {
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 6px;
-      border-radius: 4px;
-      font-size: 16px;
-      color: #5f6368;
-      transition: background 0.15s;
+      background: none; border: none; cursor: pointer;
+      padding: 6px; border-radius: 4px; font-size: 16px; color: #5f6368;
+      transition: background .15s;
     }
     .icon-btn:hover { background: #f1f3f4; color: #202124; }
 
-    /* Result tabs */
     .result-tabs {
       display: flex;
       border-bottom: 1px solid #f1f3f4;
       padding: 0 8px;
     }
     .result-tab {
-      padding: 8px 12px;
-      font-size: 13px;
-      font-weight: 500;
-      color: #5f6368;
-      cursor: pointer;
+      padding: 8px 12px; font-size: 13px; font-weight: 500;
+      color: #5f6368; cursor: pointer;
       border-bottom: 3px solid transparent;
-      transition: color 0.15s, border-color 0.15s;
+      transition: color .15s, border-color .15s;
     }
     .result-tab.active { color: #1a73e8; border-bottom-color: #1a73e8; }
     .result-tab:hover { color: #202124; }
 
-    /* ── Context / notes ── */
+    /* ── Context row ── */
     .context-row {
       border-top: 1px solid #dadce0;
       padding: 12px 16px;
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
+      display: flex; align-items: flex-start; gap: 10px;
     }
     .context-row label {
-      font-size: 13px;
-      color: #5f6368;
-      white-space: nowrap;
-      padding-top: 8px;
+      font-size: 13px; color: #5f6368; white-space: nowrap; padding-top: 8px;
+    }
+    .context-input-wrap {
+      flex: 1;
+      position: relative;
     }
     .context-row textarea {
-      flex: 1;
-      border: 1px solid #dadce0;
-      border-radius: 4px;
-      padding: 8px 12px;
-      font-size: 13px;
-      font-family: inherit;
-      resize: none;
-      outline: none;
-      min-height: 52px;
-      transition: border-color 0.15s;
+      width: 100%;
+      border: 1px solid #dadce0; border-radius: 4px;
+      padding: 8px 12px; font-size: 13px; font-family: inherit;
+      resize: none; outline: none; min-height: 52px;
+      transition: border-color .15s, background .15s;
     }
     .context-row textarea:focus { border-color: #1a73e8; }
+    .context-row textarea.drag-over {
+      border-color: #1a73e8; border-style: dashed;
+      background: #e8f0fe;
+    }
+    .context-file-bar {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 6px;
+    }
+    .context-file-hint {
+      font-size: 12px; color: #9aa0a6;
+    }
+    .btn-file-pick {
+      font-size: 12px; color: #1a73e8; background: none;
+      border: 1px solid #dadce0; border-radius: 4px;
+      padding: 3px 10px; cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-file-pick:hover { background: #e8f0fe; }
+    .context-file-name {
+      font-size: 12px; color: #34a853; display: none;
+      align-items: center; gap: 4px;
+    }
+    .context-file-name.visible { display: flex; }
+    .btn-file-clear {
+      background: none; border: none; cursor: pointer;
+      color: #9aa0a6; font-size: 14px; line-height: 1;
+    }
+    .btn-file-clear:hover { color: #ea4335; }
 
     /* ── Action bar ── */
     .action-bar {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 16px;
-      border-top: 1px solid #dadce0;
-      flex-wrap: wrap;
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; border-top: 1px solid #dadce0; flex-wrap: wrap;
     }
     .btn-primary {
-      background: #1a73e8;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      padding: 10px 24px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background 0.15s, box-shadow 0.15s;
+      background: #1a73e8; color: #fff; border: none;
+      border-radius: 4px; padding: 10px 24px;
+      font-size: 14px; font-weight: 500; cursor: pointer;
+      transition: background .15s, box-shadow .15s;
     }
     .btn-primary:hover { background: #1557b0; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
     .btn-primary:disabled { background: #dadce0; color: #9aa0a6; cursor: not-allowed; box-shadow: none; }
+
     .btn-secondary {
-      background: #fff;
-      color: #1a73e8;
-      border: 1px solid #dadce0;
-      border-radius: 4px;
-      padding: 9px 24px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background 0.15s, box-shadow 0.15s;
+      background: #fff; color: #1a73e8;
+      border: 1px solid #dadce0; border-radius: 4px;
+      padding: 9px 24px; font-size: 14px; font-weight: 500; cursor: pointer;
+      transition: background .15s, box-shadow .15s;
     }
     .btn-secondary:hover { background: #f8f9fa; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
-    .btn-secondary:disabled { color: #9aa0a6; cursor: not-allowed; }
+    .btn-secondary:disabled { color: #9aa0a6; cursor: not-allowed; border-color: #dadce0; }
+
+    .btn-stop {
+      background: #fff; color: #ea4335;
+      border: 1px solid #ea4335; border-radius: 4px;
+      padding: 9px 18px; font-size: 14px; font-weight: 500; cursor: pointer;
+      display: none; align-items: center; gap: 6px;
+      transition: background .15s;
+    }
+    .btn-stop.visible { display: inline-flex; }
+    .btn-stop:hover { background: #fce8e6; }
 
     .quality-check-label {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 13px;
-      color: #5f6368;
-      cursor: pointer;
-      user-select: none;
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; color: #5f6368; cursor: pointer; user-select: none;
     }
     .quality-check-label input { cursor: pointer; accent-color: #1a73e8; }
 
     .shortcut-hint { font-size: 12px; color: #9aa0a6; margin-left: auto; }
 
     .spinner {
-      display: none;
-      width: 20px;
-      height: 20px;
-      border: 2px solid #dadce0;
-      border-top-color: #1a73e8;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
+      display: none; width: 20px; height: 20px;
+      border: 2px solid #dadce0; border-top-color: #1a73e8;
+      border-radius: 50%; animation: spin .7s linear infinite;
     }
     .spinner.visible { display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ── Error banner ── */
+    .error-banner {
+      display: none;
+      background: #fce8e6; border: 1px solid #f5c6cb;
+      border-radius: 4px; color: #c5221f;
+      padding: 10px 14px; font-size: 13px;
+      margin: 12px 16px 0;
+    }
+    .error-banner.visible { display: block; }
+
     /* ── Validation panel ── */
     .validation-panel {
       border-top: 1px solid #dadce0;
-      padding: 16px;
-      display: none;
+      padding: 16px; display: none;
     }
     .validation-panel.visible { display: block; }
-    .validation-panel h3 {
-      font-size: 14px;
-      font-weight: 500;
-      color: #202124;
-      margin-bottom: 12px;
-    }
+    .validation-panel h3 { font-size: 14px; font-weight: 500; color: #202124; margin-bottom: 12px; }
     .val-cards { display: flex; flex-direction: column; gap: 8px; }
     .val-card {
-      border: 1px solid #dadce0;
-      border-radius: 8px;
-      padding: 12px 16px;
-      background: #fff;
+      border: 1px solid #dadce0; border-radius: 8px;
+      padding: 12px 16px; background: #fff;
     }
     .val-card.pass { border-left: 4px solid #34a853; }
     .val-card.fail { border-left: 4px solid #ea4335; }
     .val-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 2px 8px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: 500;
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500;
     }
-    .badge.green { background: #e6f4ea; color: #34a853; }
-    .badge.red   { background: #fce8e6; color: #ea4335; }
-    .badge.blue  { background: #e8f0fe; color: #1a73e8; }
-    .badge.orange{ background: #fef7e0; color: #f9ab00; }
+    .badge.green  { background: #e6f4ea; color: #34a853; }
+    .badge.red    { background: #fce8e6; color: #ea4335; }
+    .badge.blue   { background: #e8f0fe; color: #1a73e8; }
+    .badge.orange { background: #fef7e0; color: #f9ab00; }
     .val-lang { font-size: 14px; font-weight: 500; color: #202124; }
     .val-issues { margin-top: 8px; padding-left: 16px; }
     .val-issues li { font-size: 13px; color: #ea4335; margin: 3px 0; }
     .val-feedback { font-size: 13px; color: #5f6368; margin-top: 6px; }
 
-    /* ── Error banner ── */
-    .error-banner {
-      display: none;
-      background: #fce8e6;
-      border: 1px solid #f5c6cb;
-      border-radius: 4px;
-      color: #c5221f;
-      padding: 10px 14px;
-      font-size: 13px;
-      margin: 12px 16px 0;
+    /* ── Validate-only mode ── */
+    #validate-mode { display: none; }
+    #validate-mode.visible { display: block; }
+    #translate-mode { display: block; }
+    #translate-mode.hidden { display: none; }
+
+    .val-source-area {
+      padding: 0;
+      border-bottom: 1px solid #dadce0;
     }
-    .error-banner.visible { display: block; }
+    .val-source-area label {
+      display: block;
+      font-size: 12px; font-weight: 500; color: #5f6368;
+      padding: 10px 16px 4px;
+      text-transform: uppercase; letter-spacing: .5px;
+    }
+    .val-source-area textarea {
+      width: 100%; border: none; outline: none; resize: none;
+      padding: 8px 16px 16px; font-size: 15px; line-height: 1.6;
+      font-family: inherit; min-height: 140px;
+    }
+
+    .val-pairs-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px 8px;
+      border-bottom: 1px solid #f1f3f4;
+    }
+    .val-pairs-header span { font-size: 12px; font-weight: 500; color: #5f6368; text-transform: uppercase; letter-spacing: .5px; }
+    .btn-add-lang {
+      background: none; border: 1px dashed #1a73e8; border-radius: 4px;
+      color: #1a73e8; font-size: 13px; font-weight: 500;
+      padding: 5px 14px; cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-add-lang:hover { background: #e8f0fe; }
+
+    .val-pairs { display: flex; flex-direction: column; gap: 0; }
+
+    .val-pair {
+      display: grid;
+      grid-template-columns: 160px 1fr 36px;
+      gap: 0;
+      border-bottom: 1px solid #f1f3f4;
+      align-items: stretch;
+    }
+    .val-pair-lang {
+      border-right: 1px solid #f1f3f4;
+      display: flex; align-items: flex-start;
+      padding: 12px;
+    }
+    .val-pair-lang select {
+      border: 1px solid #dadce0; border-radius: 4px;
+      padding: 6px 8px; font-size: 13px; color: #202124;
+      background: #fff; cursor: pointer; outline: none; width: 100%;
+    }
+    .val-pair-lang select:focus { border-color: #1a73e8; }
+    .val-pair textarea {
+      border: none; outline: none; resize: none;
+      padding: 12px 16px; font-size: 14px; line-height: 1.6;
+      font-family: inherit; min-height: 100px;
+      color: #1a73e8;
+    }
+    .val-pair-remove {
+      border: none; background: none; cursor: pointer;
+      color: #9aa0a6; font-size: 18px;
+      display: flex; align-items: flex-start; justify-content: center;
+      padding: 12px 8px;
+      transition: color .15s;
+    }
+    .val-pair-remove:hover { color: #ea4335; }
+
+    .val-action-bar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; border-top: 1px solid #dadce0; flex-wrap: wrap;
+    }
 
     /* ── Responsive ── */
     @media (max-width: 640px) {
       .translation-area { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
       .divider-v { display: none; }
+      .val-pair { grid-template-columns: 120px 1fr 32px; }
     }
   </style>
 </head>
@@ -385,96 +381,162 @@
 <main>
   <div class="card">
 
-    <!-- Language bar -->
-    <div class="lang-bar">
-      <div class="lang-side source-side">
-        <select id="source-lang-select" title="소스 언어 선택">
-          <option value="">자동 감지</option>
-          {% for code, name in languages.items() %}
-          <option value="{{ code }}">{{ name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <button class="swap-btn" id="swap-btn" title="언어 교환">⇄</button>
-
-      <div class="lang-divider"></div>
-
-      <div class="lang-side target-side" id="target-chips">
-        <!-- chips rendered by JS -->
-      </div>
+    <!-- Mode tabs -->
+    <div class="mode-tabs">
+      <div class="mode-tab active" id="tab-translate" onclick="switchMode('translate')">🔤 번역</div>
+      <div class="mode-tab" id="tab-validate" onclick="switchMode('validate')">✅ 번역물 검증</div>
     </div>
 
-    <!-- Error banner -->
-    <div class="error-banner" id="error-banner"></div>
+    <!-- ══════════ TRANSLATE MODE ══════════ -->
+    <div id="translate-mode">
 
-    <!-- Translation area -->
-    <div class="translation-area">
-      <!-- Source -->
-      <div class="text-panel">
-        <textarea id="source-text" placeholder="번역할 내용을 입력하세요..." rows="10" spellcheck="false"></textarea>
-        <div class="panel-footer">
-          <span class="char-count" id="char-count">0</span>
-          <button class="icon-btn" id="clear-btn" title="지우기">✕</button>
+      <!-- Language bar -->
+      <div class="lang-bar">
+        <div class="lang-side source-side">
+          <select id="source-lang-select" title="소스 언어 선택">
+            <option value="">자동 감지</option>
+            {% for code, name in languages.items() %}
+            <option value="{{ code }}">{{ name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button class="swap-btn" id="swap-btn" title="언어 교환">⇄</button>
+        <div class="lang-divider"></div>
+        <div class="lang-side target-side" id="target-chips"></div>
+      </div>
+
+      <!-- Error banner -->
+      <div class="error-banner" id="error-banner"></div>
+
+      <!-- Translation area -->
+      <div class="translation-area">
+        <div class="text-panel">
+          <textarea id="source-text" placeholder="번역할 내용을 입력하세요..." rows="10" spellcheck="false"></textarea>
+          <div class="panel-footer">
+            <span class="char-count" id="char-count">0</span>
+            <button class="icon-btn" id="clear-btn" title="지우기">✕</button>
+          </div>
+        </div>
+        <div class="divider-v"></div>
+        <div class="text-panel">
+          <div class="result-tabs" id="result-tabs"></div>
+          <textarea id="result-text" readonly placeholder="번역 결과가 여기에 표시됩니다." rows="10"></textarea>
+          <div class="panel-footer">
+            <span></span>
+            <button class="icon-btn" id="copy-btn" title="복사">⎘</button>
+          </div>
         </div>
       </div>
 
-      <div class="divider-v"></div>
-
-      <!-- Result -->
-      <div class="text-panel">
-        <div class="result-tabs" id="result-tabs"></div>
-        <textarea id="result-text" readonly placeholder="번역 결과가 여기에 표시됩니다." rows="10"></textarea>
-        <div class="panel-footer">
-          <span></span>
-          <button class="icon-btn" id="copy-btn" title="복사">⎘</button>
+      <!-- Context / cautions -->
+      <div class="context-row">
+        <label for="context-input">⚠️ 번역 주의사항 / 맥락</label>
+        <div class="context-input-wrap">
+          <textarea id="context-input" rows="2"
+            placeholder="텍스트 입력 또는 파일을 드래그&드롭 / 예: 기술 문서입니다. 전문 용어를 유지해주세요."></textarea>
+          <div class="context-file-bar">
+            <button class="btn-file-pick" onclick="document.getElementById('context-file-input').click()">📎 파일 선택</button>
+            <span class="context-file-hint">또는 파일을 위 칸에 드래그&드롭 (.txt .md .json .yaml)</span>
+            <span class="context-file-name" id="context-file-name">
+              <span id="context-file-label"></span>
+              <button class="btn-file-clear" onclick="clearContextFile()" title="파일 제거">×</button>
+            </span>
+          </div>
+          <input type="file" id="context-file-input" accept=".txt,.md,.json,.yaml,.yml"
+            style="display:none" onchange="handleContextFile(this.files[0])">
         </div>
       </div>
-    </div>
 
-    <!-- Context / cautions -->
-    <div class="context-row">
-      <label for="context-input">⚠️ 번역 주의사항 / 맥락</label>
-      <textarea
-        id="context-input"
-        rows="2"
-        placeholder="예: 기술 문서입니다. 전문 용어를 유지해주세요. / 친근한 말투로 번역해주세요."
-      ></textarea>
-    </div>
+      <!-- Action bar -->
+      <div class="action-bar">
+        <button class="btn-primary" id="translate-btn" onclick="doTranslate()">번역하기</button>
+        <button class="btn-secondary" id="validate-after-btn" disabled onclick="doValidateAfter()">검증하기</button>
+        <button class="btn-stop" id="stop-btn" onclick="doStop()">■ 중지</button>
+        <span class="spinner" id="spinner"></span>
+        <label class="quality-check-label" title="API 크레딧을 사용합니다">
+          <input type="checkbox" id="quality-check" />
+          품질 점수 확인
+        </label>
+        <span class="shortcut-hint">Ctrl+Enter로 번역</span>
+      </div>
 
-    <!-- Action bar -->
-    <div class="action-bar">
-      <button class="btn-primary" id="translate-btn">번역하기</button>
-      <button class="btn-secondary" id="validate-btn" disabled>검증하기</button>
-      <label class="quality-check-label" title="API 크레딧을 사용합니다">
-        <input type="checkbox" id="quality-check" />
-        품질 점수 확인
-      </label>
-      <span class="spinner" id="spinner"></span>
-      <span class="shortcut-hint">Ctrl+Enter로 번역</span>
-    </div>
+      <!-- Inline validation results -->
+      <div class="validation-panel" id="validation-panel">
+        <h3>검증 결과</h3>
+        <div class="val-cards" id="val-cards"></div>
+      </div>
 
-    <!-- Validation results -->
-    <div class="validation-panel" id="validation-panel">
-      <h3>검증 결과</h3>
-      <div class="val-cards" id="val-cards"></div>
-    </div>
+    </div><!-- /translate-mode -->
+
+
+    <!-- ══════════ VALIDATE MODE ══════════ -->
+    <div id="validate-mode">
+
+      <!-- Source text -->
+      <div class="val-source-area">
+        <label>원문 (소스 텍스트)</label>
+        <textarea id="val-source-text" placeholder="원본 텍스트를 붙여넣으세요..."></textarea>
+      </div>
+
+      <!-- Error banner -->
+      <div class="error-banner" id="val-error-banner"></div>
+
+      <!-- Translated pairs -->
+      <div class="val-pairs-header">
+        <span>번역물</span>
+        <button class="btn-add-lang" onclick="addValPair()">+ 언어 추가</button>
+      </div>
+      <div class="val-pairs" id="val-pairs"></div>
+
+      <!-- Action bar -->
+      <div class="val-action-bar">
+        <button class="btn-primary" id="val-validate-btn" onclick="doValidateOnly()">검증하기</button>
+        <button class="btn-stop" id="val-stop-btn" onclick="doValStop()">■ 중지</button>
+        <span class="spinner" id="val-spinner"></span>
+        <label class="quality-check-label" title="API 크레딧을 사용합니다">
+          <input type="checkbox" id="val-quality-check" />
+          품질 점수 확인
+        </label>
+      </div>
+
+      <!-- Validation results -->
+      <div class="validation-panel" id="val-validation-panel">
+        <h3>검증 결과</h3>
+        <div class="val-cards" id="val-result-cards"></div>
+      </div>
+
+    </div><!-- /validate-mode -->
 
   </div>
 </main>
 
 <script>
   const LANGUAGES = {{ languages | tojson }};
-
-  // Default selected target languages
   const DEFAULT_TARGETS = ['en', 'ja', 'zh'];
   let selectedTargets = new Set(DEFAULT_TARGETS);
-
-  // Store last translation results: lang -> text
   let lastResults = {};
-
-  // Active result tab
   let activeTab = DEFAULT_TARGETS[0];
+  let currentController = null;  // AbortController for in-flight requests
+
+  // ── Mode switch ──
+  function switchMode(mode) {
+    document.getElementById('tab-translate').classList.toggle('active', mode === 'translate');
+    document.getElementById('tab-validate').classList.toggle('active', mode === 'validate');
+    document.getElementById('translate-mode').classList.toggle('hidden', mode !== 'translate');
+    document.getElementById('validate-mode').classList.toggle('visible', mode === 'validate');
+  }
+
+  // ── Stop (translate mode) ──
+  function doStop() {
+    if (currentController) { currentController.abort(); currentController = null; }
+    setLoading(false);
+  }
+
+  // ── Stop (validate-only mode) ──
+  function doValStop() {
+    if (currentController) { currentController.abort(); currentController = null; }
+    setValLoading(false);
+  }
 
   // ── Target language chips ──
   function renderChips() {
@@ -484,35 +546,25 @@
       const chip = document.createElement('span');
       chip.className = 'chip' + (selectedTargets.has(code) ? ' selected' : '');
       chip.dataset.code = code;
-
-      const label = document.createTextNode(name);
-      chip.appendChild(label);
-
+      chip.appendChild(document.createTextNode(name));
       if (selectedTargets.has(code)) {
         const x = document.createElement('span');
-        x.className = 'chip-x';
-        x.textContent = '×';
+        x.className = 'chip-x'; x.textContent = '×';
         x.addEventListener('click', e => {
           e.stopPropagation();
           if (selectedTargets.size > 1) {
             selectedTargets.delete(code);
-            if (activeTab === code) {
-              activeTab = [...selectedTargets][0];
-            }
-            renderChips();
-            renderResultTabs();
+            if (activeTab === code) activeTab = [...selectedTargets][0];
+            renderChips(); renderResultTabs();
           }
         });
         chip.appendChild(x);
       }
-
       chip.addEventListener('click', () => {
         if (selectedTargets.has(code)) return;
         selectedTargets.add(code);
-        renderChips();
-        renderResultTabs();
+        renderChips(); renderResultTabs();
       });
-
       container.appendChild(chip);
     }
   }
@@ -523,43 +575,33 @@
     tabs.innerHTML = '';
     if (selectedTargets.size <= 1) { tabs.style.display = 'none'; return; }
     tabs.style.display = 'flex';
-
     for (const code of selectedTargets) {
       const tab = document.createElement('div');
       tab.className = 'result-tab' + (activeTab === code ? ' active' : '');
       tab.textContent = LANGUAGES[code] || code;
-      tab.addEventListener('click', () => {
-        activeTab = code;
-        renderResultTabs();
-        showResult(code);
-      });
+      tab.addEventListener('click', () => { activeTab = code; renderResultTabs(); showResult(code); });
       tabs.appendChild(tab);
     }
   }
 
   function showResult(lang) {
-    const ta = document.getElementById('result-text');
-    ta.value = lastResults[lang] || '';
+    document.getElementById('result-text').value = lastResults[lang] || '';
   }
 
-  // ── Character count ──
+  // ── Char count / clear / copy ──
   document.getElementById('source-text').addEventListener('input', () => {
-    const len = document.getElementById('source-text').value.length;
-    document.getElementById('char-count').textContent = len.toLocaleString();
+    document.getElementById('char-count').textContent =
+      document.getElementById('source-text').value.length.toLocaleString();
   });
-
-  // ── Clear button ──
   document.getElementById('clear-btn').addEventListener('click', () => {
     document.getElementById('source-text').value = '';
     document.getElementById('char-count').textContent = '0';
     document.getElementById('result-text').value = '';
     lastResults = {};
     hideError();
-    document.getElementById('validate-btn').disabled = true;
+    document.getElementById('validate-after-btn').disabled = true;
     document.getElementById('validation-panel').classList.remove('visible');
   });
-
-  // ── Copy button ──
   document.getElementById('copy-btn').addEventListener('click', () => {
     const text = document.getElementById('result-text').value;
     if (text) navigator.clipboard.writeText(text).then(() => {
@@ -569,60 +611,63 @@
     });
   });
 
-  // ── Swap button ──
+  // ── Swap ──
   document.getElementById('swap-btn').addEventListener('click', () => {
     const sel = document.getElementById('source-lang-select');
     const resultText = document.getElementById('result-text').value;
     if (!resultText) return;
-
-    // If active tab lang is in source select, set it; else auto
     sel.value = activeTab;
     document.getElementById('source-text').value = resultText;
     document.getElementById('char-count').textContent = resultText.length.toLocaleString();
-
-    // Remove active tab from targets if it was source
     const newTargets = new Set(selectedTargets);
     if (newTargets.has(activeTab)) newTargets.delete(activeTab);
-    // Add old source lang as target if it was set
-    const oldSource = sel.value !== activeTab ? sel.value : '';
-    if (oldSource && oldSource in LANGUAGES) newTargets.add(oldSource);
+    if (sel.value && sel.value in LANGUAGES) newTargets.add(sel.value);
     if (newTargets.size === 0) newTargets.add('en');
     selectedTargets = newTargets;
     activeTab = [...selectedTargets][0];
-
     lastResults = {};
-    renderChips();
-    renderResultTabs();
+    renderChips(); renderResultTabs();
     document.getElementById('result-text').value = '';
-    document.getElementById('validate-btn').disabled = true;
+    document.getElementById('validate-after-btn').disabled = true;
     document.getElementById('validation-panel').classList.remove('visible');
   });
 
-  // ── Error banner ──
+  // ── Error helpers ──
   function showError(msg) {
     const el = document.getElementById('error-banner');
-    el.textContent = msg;
-    el.classList.add('visible');
+    el.textContent = msg; el.classList.add('visible');
   }
-  function hideError() {
-    document.getElementById('error-banner').classList.remove('visible');
-  }
+  function hideError() { document.getElementById('error-banner').classList.remove('visible'); }
 
-  // ── Loading ──
+  function showValError(msg) {
+    const el = document.getElementById('val-error-banner');
+    el.textContent = msg; el.classList.add('visible');
+  }
+  function hideValError() { document.getElementById('val-error-banner').classList.remove('visible'); }
+
+  // ── Loading helpers ──
   function setLoading(on) {
     document.getElementById('spinner').classList.toggle('visible', on);
     document.getElementById('translate-btn').disabled = on;
+    document.getElementById('stop-btn').classList.toggle('visible', on);
+  }
+  function setValLoading(on) {
+    document.getElementById('val-spinner').classList.toggle('visible', on);
+    document.getElementById('val-validate-btn').disabled = on;
+    document.getElementById('val-stop-btn').classList.toggle('visible', on);
   }
 
   // ── Translate ──
   async function doTranslate() {
     const text = document.getElementById('source-text').value.trim();
     if (!text) return;
+    if (currentController) currentController.abort();
+    currentController = new AbortController();
 
     hideError();
     setLoading(true);
     document.getElementById('result-text').value = '';
-    document.getElementById('validate-btn').disabled = true;
+    document.getElementById('validate-after-btn').disabled = true;
     document.getElementById('validation-panel').classList.remove('visible');
 
     const sourceLang = document.getElementById('source-lang-select').value || null;
@@ -634,47 +679,37 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, target_langs: targetLangs, source_lang: sourceLang, context }),
+        signal: currentController.signal,
       });
       const data = await resp.json();
       if (!resp.ok) { showError(data.error || '번역 실패'); return; }
-
       lastResults = data.results || {};
       const errEntries = Object.entries(data.errors || {});
-      if (errEntries.length) {
-        showError('일부 언어 번역 실패: ' + errEntries.map(([l, e]) => `${l}: ${e}`).join('; '));
-      }
-
-      // Ensure activeTab is in results, else pick first available
-      if (!lastResults[activeTab]) {
-        activeTab = Object.keys(lastResults)[0] || [...selectedTargets][0];
-      }
+      if (errEntries.length) showError('일부 실패: ' + errEntries.map(([l, e]) => `${l}: ${e}`).join('; '));
+      if (!lastResults[activeTab]) activeTab = Object.keys(lastResults)[0] || [...selectedTargets][0];
       renderResultTabs();
       showResult(activeTab);
-      if (Object.keys(lastResults).length > 0) {
-        document.getElementById('validate-btn').disabled = false;
-      }
+      if (Object.keys(lastResults).length > 0) document.getElementById('validate-after-btn').disabled = false;
     } catch (e) {
-      showError('네트워크 오류: ' + e.message);
+      if (e.name !== 'AbortError') showError('오류: ' + e.message);
     } finally {
       setLoading(false);
+      currentController = null;
     }
   }
 
-  document.getElementById('translate-btn').addEventListener('click', doTranslate);
-  document.addEventListener('keydown', e => {
-    if (e.ctrlKey && e.key === 'Enter') doTranslate();
-  });
+  document.addEventListener('keydown', e => { if (e.ctrlKey && e.key === 'Enter') doTranslate(); });
 
-  // ── Validate ──
-  async function doValidate() {
+  // ── Validate after translation ──
+  async function doValidateAfter() {
     const sourceText = document.getElementById('source-text').value.trim();
     if (!sourceText || Object.keys(lastResults).length === 0) return;
+    if (currentController) currentController.abort();
+    currentController = new AbortController();
 
     hideError();
     setLoading(true);
     document.getElementById('validation-panel').classList.remove('visible');
-
-    const checkQuality = document.getElementById('quality-check').checked;
 
     try {
       const resp = await fetch('/api/validate', {
@@ -683,27 +718,110 @@
         body: JSON.stringify({
           source_text: sourceText,
           translated_texts: lastResults,
-          check_quality: checkQuality,
+          check_quality: document.getElementById('quality-check').checked,
         }),
+        signal: currentController.signal,
       });
       const data = await resp.json();
       if (!resp.ok) { showError(data.error || '검증 실패'); return; }
-
-      renderValidation(data.results || {});
+      renderValidation(data.results || {}, 'val-cards', 'validation-panel');
     } catch (e) {
-      showError('검증 오류: ' + e.message);
+      if (e.name !== 'AbortError') showError('검증 오류: ' + e.message);
     } finally {
       setLoading(false);
+      currentController = null;
     }
   }
 
-  document.getElementById('validate-btn').addEventListener('click', doValidate);
+  // ── Validate-only mode: manage pairs ──
+  let pairCount = 0;
 
-  function renderValidation(results) {
-    const panel = document.getElementById('validation-panel');
-    const cards = document.getElementById('val-cards');
+  function addValPair(defaultLang) {
+    pairCount++;
+    const id = pairCount;
+    const pair = document.createElement('div');
+    pair.className = 'val-pair';
+    pair.dataset.id = id;
+
+    // Language selector
+    const langCell = document.createElement('div');
+    langCell.className = 'val-pair-lang';
+    const sel = document.createElement('select');
+    sel.dataset.role = 'lang';
+    for (const [code, name] of Object.entries(LANGUAGES)) {
+      const opt = document.createElement('option');
+      opt.value = code; opt.textContent = name;
+      if (code === (defaultLang || 'en')) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    langCell.appendChild(sel);
+
+    // Textarea
+    const ta = document.createElement('textarea');
+    ta.placeholder = '번역된 텍스트를 붙여넣으세요...';
+    ta.dataset.role = 'text';
+
+    // Remove button
+    const rm = document.createElement('button');
+    rm.className = 'val-pair-remove'; rm.textContent = '×'; rm.title = '제거';
+    rm.onclick = () => {
+      pair.remove();
+    };
+
+    pair.appendChild(langCell);
+    pair.appendChild(ta);
+    pair.appendChild(rm);
+    document.getElementById('val-pairs').appendChild(pair);
+  }
+
+  // ── Validate-only: submit ──
+  async function doValidateOnly() {
+    const sourceText = document.getElementById('val-source-text').value.trim();
+    if (!sourceText) { showValError('원문을 입력하세요.'); return; }
+
+    const pairs = document.querySelectorAll('#val-pairs .val-pair');
+    const translatedTexts = {};
+    let hasText = false;
+    pairs.forEach(pair => {
+      const lang = pair.querySelector('[data-role="lang"]').value;
+      const text = pair.querySelector('[data-role="text"]').value.trim();
+      if (text) { translatedTexts[lang] = text; hasText = true; }
+    });
+    if (!hasText) { showValError('번역된 텍스트를 하나 이상 입력하세요.'); return; }
+
+    if (currentController) currentController.abort();
+    currentController = new AbortController();
+
+    hideValError();
+    setValLoading(true);
+    document.getElementById('val-validation-panel').classList.remove('visible');
+
+    try {
+      const resp = await fetch('/api/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_text: sourceText,
+          translated_texts: translatedTexts,
+          check_quality: document.getElementById('val-quality-check').checked,
+        }),
+        signal: currentController.signal,
+      });
+      const data = await resp.json();
+      if (!resp.ok) { showValError(data.error || '검증 실패'); return; }
+      renderValidation(data.results || {}, 'val-result-cards', 'val-validation-panel');
+    } catch (e) {
+      if (e.name !== 'AbortError') showValError('오류: ' + e.message);
+    } finally {
+      setValLoading(false);
+      currentController = null;
+    }
+  }
+
+  // ── Shared validation renderer ──
+  function renderValidation(results, cardsId, panelId) {
+    const cards = document.getElementById(cardsId);
     cards.innerHTML = '';
-
     for (const [lang, r] of Object.entries(results)) {
       const card = document.createElement('div');
       card.className = 'val-card ' + (r.passed ? 'pass' : 'fail');
@@ -711,54 +829,83 @@
       const header = document.createElement('div');
       header.className = 'val-header';
 
-      const langLabel = document.createElement('span');
-      langLabel.className = 'val-lang';
-      langLabel.textContent = (LANGUAGES[lang] || lang) + ` (${lang})`;
-      header.appendChild(langLabel);
+      const lbl = document.createElement('span');
+      lbl.className = 'val-lang';
+      lbl.textContent = (LANGUAGES[lang] || lang) + ` (${lang})`;
+      header.appendChild(lbl);
 
-      // Completeness badge
       const cb = document.createElement('span');
       cb.className = 'badge ' + (r.complete ? 'green' : 'red');
       cb.textContent = r.complete ? '✅ 완전성 통과' : `❌ ${r.issues.length}개 문제`;
       header.appendChild(cb);
 
-      // Quality badge
-      if (r.quality_score !== null && r.quality_score !== undefined) {
+      if (r.quality_score != null) {
         const qb = document.createElement('span');
         qb.className = 'badge ' + (r.quality_score >= 7 ? 'blue' : 'orange');
         qb.textContent = `품질 ${r.quality_score.toFixed(1)}/10`;
         header.appendChild(qb);
       }
-
       card.appendChild(header);
 
-      if (r.issues && r.issues.length > 0) {
+      if (r.issues && r.issues.length) {
         const ul = document.createElement('ul');
         ul.className = 'val-issues';
         r.issues.forEach(issue => {
-          const li = document.createElement('li');
-          li.textContent = issue;
-          ul.appendChild(li);
+          const li = document.createElement('li'); li.textContent = issue; ul.appendChild(li);
         });
         card.appendChild(ul);
       }
-
       if (r.quality_feedback) {
         const fb = document.createElement('div');
         fb.className = 'val-feedback';
         fb.textContent = '피드백: ' + r.quality_feedback;
         card.appendChild(fb);
       }
-
       cards.appendChild(card);
     }
-
-    panel.classList.add('visible');
+    document.getElementById(panelId).classList.add('visible');
   }
+
+  // ── Context file drag & drop ──
+  function handleContextFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      document.getElementById('context-input').value = e.target.result;
+      document.getElementById('context-file-label').textContent = file.name;
+      document.getElementById('context-file-name').classList.add('visible');
+    };
+    reader.readAsText(file, 'utf-8');
+  }
+
+  function clearContextFile() {
+    document.getElementById('context-file-input').value = '';
+    document.getElementById('context-file-name').classList.remove('visible');
+    document.getElementById('context-input').value = '';
+  }
+
+  (function setupContextDrop() {
+    const ta = document.getElementById('context-input');
+    ta.addEventListener('dragover', e => {
+      e.preventDefault();
+      ta.classList.add('drag-over');
+    });
+    ta.addEventListener('dragleave', () => ta.classList.remove('drag-over'));
+    ta.addEventListener('drop', e => {
+      e.preventDefault();
+      ta.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) handleContextFile(file);
+    });
+  })();
 
   // ── Init ──
   renderChips();
   renderResultTabs();
+  // Add default 3 language pairs in validate mode
+  addValPair('en');
+  addValPair('ja');
+  addValPair('zh');
 </script>
 </body>
 </html>
