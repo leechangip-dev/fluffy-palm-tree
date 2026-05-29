@@ -648,9 +648,13 @@
            onclick="document.getElementById('patent-file-input').click()">
         <div class="drop-icon">📂</div>
         <div class="drop-title">파일을 드래그&드롭 또는 클릭하여 선택</div>
-        <div class="drop-hint">일본어 원문 · 영어 번역문 · 번역자 메모 (.txt .md 지원, 여러 파일 동시 선택 가능)</div>
+        <div class="drop-hint">
+          🇯🇵 일본어 원문 · 🇺🇸 영어 번역문 · 📝 번역자 메모 · 🖼 도면(PDF) · 📊 SER(xlsx)<br>
+          <small>지원 형식: .docx &nbsp;.txt &nbsp;.md &nbsp;.pdf &nbsp;.xlsx</small>
+        </div>
       </div>
-      <input type="file" id="patent-file-input" multiple accept=".txt,.md"
+      <input type="file" id="patent-file-input" multiple
+             accept=".txt,.md,.docx,.pdf,.xlsx"
              style="display:none" onchange="handlePatentFiles(this.files)">
 
       <!-- File list -->
@@ -662,6 +666,8 @@
       <!-- Action bar -->
       <div class="patent-action-bar">
         <button class="btn-primary" id="patent-verify-btn" onclick="doPatentVerify()">검증 시작</button>
+        <button class="btn-secondary" id="patent-report-btn" style="display:none"
+                onclick="doPatentReport()">📥 DOCX 보고서 다운로드</button>
         <button class="btn-stop" id="patent-stop-btn" onclick="doPatentStop()">■ 중지</button>
         <span class="spinner" id="patent-spinner"></span>
         <span style="font-size:12px;color:#9aa0a6;">원문(JP) + 번역문(EN) 파일이 필요합니다</span>
@@ -686,6 +692,23 @@
           </div>
           <div id="patent-error-cards"></div>
         </div>
+
+        <div id="patent-drawing-section" style="display:none">
+          <div class="patent-section-title">
+            🖼️ 도면 Callout 불일치
+            <span class="patent-count-badge" id="drawing-count">0건</span>
+          </div>
+          <div id="patent-drawing-cards"></div>
+        </div>
+
+        <div id="patent-ser-section" style="display:none">
+          <div class="patent-section-title">
+            📊 SER 검증
+            <span class="patent-count-badge" id="ser-count">0건</span>
+          </div>
+          <div id="patent-ser-cards"></div>
+        </div>
+
       </div>
 
     </div><!-- /patent-mode -->
@@ -1056,40 +1079,73 @@
   // PATENT VERIFICATION MODE
   // ══════════════════════════════════════════════════
 
-  // patentFiles: array of { file: File, role: 'source'|'translation'|'notes'|'ignore', text: string }
+  // patentFiles: array of { file, role, text, loading }
   let patentFiles = [];
+  let lastPatentResult = null;
 
-  function hasJapanese(text) {
-    return /[぀-ヿ一-鿿]/.test(text.slice(0, 500));
-  }
+  const PATENT_ROLES = [
+    ['source',      '🇯🇵 원문 (JP)'],
+    ['translation', '🇺🇸 번역문 (EN)'],
+    ['notes',       '📝 번역자 메모'],
+    ['drawing',     '🖼️ 도면 (PDF)'],
+    ['ser',         '📊 SER (xlsx)'],
+    ['ignore',      '— 제외'],
+  ];
+  const ROLE_ICONS = { source:'🇯🇵', translation:'🇺🇸', notes:'📝', drawing:'🖼️', ser:'📊', ignore:'📄' };
+
+  function hasJapanese(text) { return /[぀-ヿ一-鿿]/.test(text.slice(0, 600)); }
+
   function guessRole(file, text) {
     const n = file.name.toLowerCase();
-    if (/\bjp\b|japan|原文|原稿/.test(n)) return 'source';
-    if (/\ben\b|english|訳文|translation/.test(n)) return 'translation';
-    if (/note|memo|コメント|메모/.test(n)) return 'notes';
-    // detect by content
+    const ext = n.split('.').pop();
+    if (ext === 'pdf') return 'drawing';
+    if (ext === 'xlsx') return 'ser';
+    if (/\bjp\b|japan|原文|原稿|和文/.test(n)) return 'source';
+    if (/\ben\b|english|翻訳|translation|en-us/.test(n)) return 'translation';
+    if (/note|memo|メモ|コメント|메모/.test(n)) return 'notes';
+    if (/ser|error/.test(n)) return 'ser';
+    if (/draw|fig|図|도면/.test(n)) return 'drawing';
     if (hasJapanese(text)) return 'source';
-    if (/[a-zA-Z]/.test(text.slice(0, 200)) && !hasJapanese(text)) return 'translation';
+    if (/[a-zA-Z]/.test(text.slice(0, 300)) && !hasJapanese(text)) return 'translation';
     return 'ignore';
   }
 
-  function readFile(file) {
-    return new Promise((res, rej) => {
-      const r = new FileReader();
-      r.onload = e => res(e.target.result);
-      r.onerror = rej;
-      r.readAsText(file, 'utf-8');
-    });
+  async function extractTextViaServer(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const resp = await fetch('/api/extract-text', { method: 'POST', body: formData });
+    const data = await resp.json();
+    if (!resp.ok || data.error) throw new Error(data.error || 'extraction failed');
+    return data.text;
   }
 
   async function handlePatentFiles(fileList) {
     for (const file of fileList) {
       if (patentFiles.find(f => f.file.name === file.name)) continue;
-      const text = await readFile(file);
-      const role = guessRole(file, text);
-      patentFiles.push({ file, role, text });
+      const entry = { file, role: 'ignore', text: '', loading: true };
+      patentFiles.push(entry);
+      renderPatentFileList();
+      try {
+        const ext = file.name.split('.').pop().toLowerCase();
+        let text;
+        if (['txt', 'md'].includes(ext)) {
+          text = await new Promise((res, rej) => {
+            const r = new FileReader();
+            r.onload = e => res(e.target.result); r.onerror = rej;
+            r.readAsText(file, 'utf-8');
+          });
+        } else {
+          text = await extractTextViaServer(file);
+        }
+        entry.text = text;
+        entry.role = guessRole(file, text);
+      } catch (e) {
+        entry.role = 'ignore'; entry.text = '';
+      } finally {
+        entry.loading = false;
+        renderPatentFileList();
+      }
     }
-    renderPatentFileList();
   }
 
   function renderPatentFileList() {
@@ -1101,13 +1157,11 @@
 
       const icon = document.createElement('span');
       icon.className = 'patent-file-icon';
-      icon.textContent = entry.role === 'source' ? '🇯🇵' :
-                         entry.role === 'translation' ? '🇺🇸' :
-                         entry.role === 'notes' ? '📝' : '📄';
+      icon.textContent = entry.loading ? '⏳' : (ROLE_ICONS[entry.role] || '📄');
 
       const name = document.createElement('span');
       name.className = 'patent-file-name';
-      name.textContent = entry.file.name;
+      name.textContent = entry.file.name + (entry.loading ? ' (추출 중...)' : '');
 
       const size = document.createElement('span');
       size.className = 'patent-file-size';
@@ -1116,21 +1170,14 @@
       const roleWrap = document.createElement('div');
       roleWrap.className = 'patent-file-role';
       const sel = document.createElement('select');
-      [
-        ['source',      '🇯🇵 원문 (JP)'],
-        ['translation', '🇺🇸 번역문 (EN)'],
-        ['notes',       '📝 번역자 메모'],
-        ['ignore',      '— 제외'],
-      ].forEach(([val, lbl]) => {
+      sel.disabled = entry.loading;
+      PATENT_ROLES.forEach(([val, lbl]) => {
         const opt = document.createElement('option');
         opt.value = val; opt.textContent = lbl;
         if (val === entry.role) opt.selected = true;
         sel.appendChild(opt);
       });
-      sel.onchange = () => {
-        patentFiles[idx].role = sel.value;
-        renderPatentFileList();
-      };
+      sel.onchange = () => { patentFiles[idx].role = sel.value; renderPatentFileList(); };
       roleWrap.appendChild(sel);
 
       const rm = document.createElement('button');
@@ -1172,16 +1219,20 @@
 
   async function doPatentVerify() {
     hidePatentError();
+    if (patentFiles.some(f => f.loading)) { showPatentError('파일 추출이 완료될 때까지 기다려 주세요.'); return; }
     const src  = patentFiles.find(f => f.role === 'source');
     const trl  = patentFiles.find(f => f.role === 'translation');
     const note = patentFiles.find(f => f.role === 'notes');
-    if (!src)  { showPatentError('원문(JP) 파일을 추가해 주세요.'); return; }
-    if (!trl)  { showPatentError('번역문(EN) 파일을 추가해 주세요.'); return; }
+    const drw  = patentFiles.find(f => f.role === 'drawing');
+    const ser  = patentFiles.find(f => f.role === 'ser');
+    if (!src) { showPatentError('원문(JP) 파일을 추가해 주세요.'); return; }
+    if (!trl) { showPatentError('번역문(EN) 파일을 추가해 주세요.'); return; }
 
     if (currentController) currentController.abort();
     currentController = new AbortController();
     setPatentLoading(true);
     document.getElementById('patent-results').style.display = 'none';
+    document.getElementById('patent-report-btn').style.display = 'none';
 
     try {
       const resp = await fetch('/api/patent-verify', {
@@ -1191,12 +1242,21 @@
           source_text: src.text,
           translation_text: trl.text,
           notes_text: note ? note.text : '',
+          drawing_text: drw ? drw.text : '',
+          ser_data: ser ? ser.text : '',
         }),
         signal: currentController.signal,
       });
       const data = await resp.json();
       if (!resp.ok || data.error) { showPatentError(data.error || '검증 실패'); return; }
+      lastPatentResult = data;
+      lastPatentResult._filenames = {
+        source: src.file.name, translation: trl.file.name,
+        notes: note ? note.file.name : '', drawing: drw ? drw.file.name : '',
+        ser: ser ? ser.file.name : '',
+      };
       renderPatentResults(data);
+      document.getElementById('patent-report-btn').style.display = 'inline-flex';
     } catch (e) {
       if (e.name !== 'AbortError') showPatentError('오류: ' + e.message);
     } finally {
@@ -1205,11 +1265,28 @@
     }
   }
 
+  async function doPatentReport() {
+    if (!lastPatentResult) return;
+    const payload = { ...lastPatentResult, filenames: lastPatentResult._filenames };
+    const resp = await fetch('/api/patent-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) { showPatentError('DOCX 생성 실패'); return; }
+    const blob = await resp.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '번역검증보고서.docx';
+    a.click();
+  }
+
   function renderPatentResults(data) {
     const corrections = data.corrections || [];
     const sourceErrors = data.source_errors || [];
+    const drawingMismatches = data.drawing_mismatches || [];
+    const serVerification = data.ser_verification || [];
 
-    // Summary
     document.getElementById('patent-summary').textContent = data.summary || '';
 
     // Corrections
@@ -1223,29 +1300,16 @@
         const sev = c.severity || '경미';
         const card = document.createElement('div');
         card.className = `correction-card sev-${sev}`;
-
         card.innerHTML = `
           <div class="correction-header">
-            <span class="sev-badge ${sev}">${sev}</span>
+            <span class="sev-badge ${sev}">${esc(sev)}</span>
             <span class="correction-location">${esc(c.location || '')}</span>
           </div>
           <div class="correction-body">
-            <div class="correction-row">
-              <span class="lbl">원문(JP)</span>
-              <span class="jp">${esc(c.original_jp || '')}</span>
-            </div>
-            <div class="correction-row">
-              <span class="lbl">기존 번역</span>
-              <span class="old">${esc(c.existing_en || '')}</span>
-            </div>
-            <div class="correction-row">
-              <span class="lbl">수정 번역</span>
-              <span class="new">${esc(c.corrected_en || '')}</span>
-            </div>
-            <div class="correction-row">
-              <span class="lbl">이유</span>
-              <span class="why">${esc(c.reason || '')}</span>
-            </div>
+            <div class="correction-row"><span class="lbl">원문(JP)</span><span class="jp">${esc(c.original_jp || '')}</span></div>
+            <div class="correction-row"><span class="lbl">기존 번역</span><span class="old">${esc(c.existing_en || '')}</span></div>
+            <div class="correction-row"><span class="lbl">수정 번역</span><span class="new">${esc(c.corrected_en || '')}</span></div>
+            <div class="correction-row"><span class="lbl">이유</span><span class="why">${esc(c.reason || '')}</span></div>
           </div>`;
         ccards.appendChild(card);
       });
@@ -1271,6 +1335,60 @@
           ${e.ser_note ? `<div class="ser-note-text">SER: ${esc(e.ser_note)}</div>` : ''}`;
         ecards.appendChild(card);
       });
+    }
+
+    // Drawing mismatches
+    const dsec = document.getElementById('patent-drawing-section');
+    if (drawingMismatches.length > 0) {
+      document.getElementById('drawing-count').textContent = drawingMismatches.length + '건';
+      const dcards = document.getElementById('patent-drawing-cards');
+      dcards.innerHTML = '';
+      drawingMismatches.forEach(m => {
+        const card = document.createElement('div');
+        card.className = 'ser-card ser-required';
+        card.innerHTML = `
+          <div class="ser-header">
+            <span class="ser-badge required">불일치</span>
+            <span class="ser-location">${esc(m.location || '')}</span>
+          </div>
+          <div class="correction-row" style="padding:4px 0">
+            <span class="lbl">JP에서</span><span>${esc(m.jp_ref || '')}</span>
+          </div>
+          <div class="correction-row" style="padding:4px 0">
+            <span class="lbl">EN에서</span><span>${esc(m.en_ref || '')}</span>
+          </div>
+          <div class="correction-row" style="padding:4px 0">
+            <span class="lbl">도면</span><span>${esc(m.drawing_ref || '')}</span>
+          </div>
+          <div class="ser-issue">${esc(m.issue || '')}</div>`;
+        dcards.appendChild(card);
+      });
+      dsec.style.display = 'block';
+    } else {
+      dsec.style.display = 'none';
+    }
+
+    // SER verification
+    const ssec = document.getElementById('patent-ser-section');
+    if (serVerification.length > 0) {
+      document.getElementById('ser-count').textContent = serVerification.length + '건';
+      const scards = document.getElementById('patent-ser-cards');
+      scards.innerHTML = '';
+      serVerification.forEach(s => {
+        const ok = s.status === 'OK';
+        const card = document.createElement('div');
+        card.className = 'ser-card ' + (ok ? 'ser-note-only' : 'ser-required');
+        card.innerHTML = `
+          <div class="ser-header">
+            <span class="ser-badge ${ok ? 'info' : 'required'}">${esc(s.status || '')}</span>
+            <span class="ser-location">SER ${esc(String(s.ser_no || ''))} &nbsp; ${esc(s.location || '')}</span>
+          </div>
+          <div class="ser-issue">${esc(s.note || '')}</div>`;
+        scards.appendChild(card);
+      });
+      ssec.style.display = 'block';
+    } else {
+      ssec.style.display = 'none';
     }
 
     document.getElementById('patent-results').style.display = 'block';
