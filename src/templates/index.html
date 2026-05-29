@@ -493,6 +493,45 @@
     .ser-issue { font-size: 13px; color: #5f6368; }
     .ser-note-text { font-size: 12px; color: #ea4335; margin-top: 4px; }
 
+    /* ── Patent issues table ── */
+    .patent-table {
+      width: 100%; border-collapse: collapse;
+      font-size: 12px; line-height: 1.4;
+    }
+    .patent-table th {
+      background: #1a73e8; color: #fff;
+      padding: 8px 10px; text-align: left;
+      font-weight: 600; font-size: 11px;
+      border: 1px solid #1557b0;
+      white-space: nowrap;
+    }
+    .patent-table td {
+      padding: 7px 10px;
+      border: 1px solid #dadce0;
+      vertical-align: top;
+      background: #fff;
+    }
+    .patent-table tr:hover td { background: #f8f9fa; }
+    .patent-table td.sev-심각 { background: #fce8e6; }
+    .patent-table td.sev-보통  { background: #fef7e0; }
+    .patent-table td.sev-경미  { background: #e6f4ea; }
+    .patent-table td.ser-req   { background: #fce8e6; }
+    .sev-chip {
+      display: inline-block; padding: 2px 6px; border-radius: 10px;
+      font-size: 10px; font-weight: 700;
+    }
+    .sev-chip.심각 { background:#fce8e6; color:#c5221f; }
+    .sev-chip.보통  { background:#fef7e0; color:#b06000; }
+    .sev-chip.경미  { background:#e6f4ea; color:#1e7e34; }
+    .sev-dot {
+      display: inline-block; width: 8px; height: 8px;
+      border-radius: 50%; margin-right: 3px;
+    }
+    .sev-dot-심각 { background:#ea4335; }
+    .sev-dot-보통  { background:#f9ab00; }
+    .sev-dot-경미  { background:#34a853; }
+    .check-cell { text-align:center; font-size:16px; cursor:pointer; user-select:none; }
+
     /* ── Responsive ── */
     @media (max-width: 640px) {
       .translation-area { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
@@ -666,8 +705,10 @@
       <!-- Action bar -->
       <div class="patent-action-bar">
         <button class="btn-primary" id="patent-verify-btn" onclick="doPatentVerify()">검증 시작</button>
-        <button class="btn-secondary" id="patent-report-btn" style="display:none"
-                onclick="doPatentReport()">📥 DOCX 보고서 다운로드</button>
+        <button class="btn-secondary" id="patent-report-xlsx" style="display:none"
+                onclick="doPatentReport('xlsx')">📥 Excel 다운로드</button>
+        <button class="btn-secondary" id="patent-report-docx" style="display:none"
+                onclick="doPatentReport('docx')">📄 DOCX 다운로드</button>
         <button class="btn-stop" id="patent-stop-btn" onclick="doPatentStop()">■ 중지</button>
         <span class="spinner" id="patent-spinner"></span>
         <span style="font-size:12px;color:#9aa0a6;">원문(JP) + 번역문(EN) 파일이 필요합니다</span>
@@ -677,20 +718,51 @@
       <div id="patent-results" class="patent-results" style="display:none">
         <div class="patent-summary" id="patent-summary"></div>
 
-        <div id="patent-corrections-section">
+        <div id="patent-issues-section">
           <div class="patent-section-title">
-            ✏️ 수정 제안
-            <span class="patent-count-badge" id="corrections-count">0건</span>
+            ✏️ 指摘事項 / 지적사항
+            <span class="patent-count-badge" id="issues-count">0건</span>
+            <span style="margin-left:auto;font-size:12px;font-weight:400;color:#5f6368">
+              <span class="sev-dot sev-dot-심각"></span>심각&nbsp;
+              <span class="sev-dot sev-dot-보통"></span>보통&nbsp;
+              <span class="sev-dot sev-dot-경미"></span>경미
+            </span>
           </div>
-          <div id="patent-correction-cards"></div>
+          <div style="overflow-x:auto">
+            <table class="patent-table" id="patent-issues-table">
+              <thead><tr>
+                <th style="width:46px">No</th>
+                <th style="width:22%">原文 (JP)</th>
+                <th style="width:22%">訳文 (EN)</th>
+                <th style="width:70px">エリア</th>
+                <th>指摘事項 / 수정이유</th>
+                <th style="width:18%">修正訳文</th>
+                <th style="width:58px">심각도</th>
+                <th style="width:40px">確認済</th>
+              </tr></thead>
+              <tbody id="patent-issues-tbody"></tbody>
+            </table>
+          </div>
         </div>
 
-        <div id="patent-errors-section">
+        <div id="patent-errors-section" style="margin-top:20px">
           <div class="patent-section-title">
-            ⚠️ 원문 오류
+            ⚠️ 원문 오류 / 原文エラー
             <span class="patent-count-badge" id="errors-count">0건</span>
           </div>
-          <div id="patent-error-cards"></div>
+          <div style="overflow-x:auto">
+            <table class="patent-table" id="patent-errors-table">
+              <thead><tr>
+                <th style="width:46px">No</th>
+                <th style="width:30%">原文 (JP)</th>
+                <th style="width:70px">エリア</th>
+                <th>오류 내용</th>
+                <th style="width:60px">SER</th>
+                <th style="width:40px">確認済</th>
+              </tr></thead>
+              <tbody id="patent-errors-tbody"></tbody>
+            </table>
+          </div>
         </div>
 
         <div id="patent-drawing-section" style="display:none">
@@ -1232,7 +1304,8 @@
     currentController = new AbortController();
     setPatentLoading(true);
     document.getElementById('patent-results').style.display = 'none';
-    document.getElementById('patent-report-btn').style.display = 'none';
+    document.getElementById('patent-report-xlsx').style.display = 'none';
+    document.getElementById('patent-report-docx').style.display = 'none';
 
     try {
       const resp = await fetch('/api/patent-verify', {
@@ -1256,7 +1329,8 @@
         ser: ser ? ser.file.name : '',
       };
       renderPatentResults(data);
-      document.getElementById('patent-report-btn').style.display = 'inline-flex';
+      document.getElementById('patent-report-xlsx').style.display = 'inline-flex';
+      document.getElementById('patent-report-docx').style.display = 'inline-flex';
     } catch (e) {
       if (e.name !== 'AbortError') showPatentError('오류: ' + e.message);
     } finally {
@@ -1265,79 +1339,85 @@
     }
   }
 
-  async function doPatentReport() {
+  async function doPatentReport(fmt) {
     if (!lastPatentResult) return;
-    const payload = { ...lastPatentResult, filenames: lastPatentResult._filenames };
-    const resp = await fetch('/api/patent-report', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!resp.ok) { showPatentError('DOCX 생성 실패'); return; }
-    const blob = await resp.blob();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = '번역검증보고서.docx';
-    a.click();
+    const payload = { ...lastPatentResult, format: fmt, filenames: lastPatentResult._filenames };
+    const btn = fmt === 'xlsx' ? document.getElementById('patent-report-xlsx') : document.getElementById('patent-report-docx');
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = '생성 중...';
+    try {
+      const resp = await fetch('/api/patent-report', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) { showPatentError('보고서 생성 실패'); return; }
+      const blob = await resp.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = fmt === 'xlsx' ? '번역검증보고서.xlsx' : '번역검증보고서.docx';
+      a.click();
+    } finally {
+      btn.disabled = false; btn.textContent = orig;
+    }
   }
 
   function renderPatentResults(data) {
-    const corrections = data.corrections || [];
-    const sourceErrors = data.source_errors || [];
+    const issues         = data.issues || [];
+    const sourceErrors   = data.source_errors || [];
     const drawingMismatches = data.drawing_mismatches || [];
-    const serVerification = data.ser_verification || [];
+    const serVerification   = data.ser_verification || [];
 
     document.getElementById('patent-summary').textContent = data.summary || '';
 
-    // Corrections
-    document.getElementById('corrections-count').textContent = corrections.length + '건';
-    const ccards = document.getElementById('patent-correction-cards');
-    ccards.innerHTML = '';
-    if (corrections.length === 0) {
-      ccards.innerHTML = '<p style="font-size:13px;color:#34a853;padding:8px 0">✅ 수정 제안 없음</p>';
+    // ── Issues table ──
+    document.getElementById('issues-count').textContent = issues.length + '건';
+    const tbody = document.getElementById('patent-issues-tbody');
+    tbody.innerHTML = '';
+    if (issues.length === 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="8" style="text-align:center;color:#34a853;padding:16px">✅ 지적사항 없음</td>';
+      tbody.appendChild(tr);
     } else {
-      corrections.forEach(c => {
-        const sev = c.severity || '경미';
-        const card = document.createElement('div');
-        card.className = `correction-card sev-${sev}`;
-        card.innerHTML = `
-          <div class="correction-header">
-            <span class="sev-badge ${sev}">${esc(sev)}</span>
-            <span class="correction-location">${esc(c.location || '')}</span>
-          </div>
-          <div class="correction-body">
-            <div class="correction-row"><span class="lbl">원문(JP)</span><span class="jp">${esc(c.original_jp || '')}</span></div>
-            <div class="correction-row"><span class="lbl">기존 번역</span><span class="old">${esc(c.existing_en || '')}</span></div>
-            <div class="correction-row"><span class="lbl">수정 번역</span><span class="new">${esc(c.corrected_en || '')}</span></div>
-            <div class="correction-row"><span class="lbl">이유</span><span class="why">${esc(c.reason || '')}</span></div>
-          </div>`;
-        ccards.appendChild(card);
+      issues.forEach(item => {
+        const sev = item.severity || '경미';
+        const tr  = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${esc(String(item.no || ''))}</td>
+          <td>${esc(item.original_jp || '')}</td>
+          <td>${esc(item.existing_en || '')}</td>
+          <td style="text-align:center">${esc(item.area || '')}</td>
+          <td>${esc(item.issue || '').replace(/\n/g,'<br>')}</td>
+          <td style="color:#1a73e8">${esc(item.corrected_en || '')}</td>
+          <td class="sev-${sev}" style="text-align:center"><span class="sev-chip ${sev}">${sev}</span></td>
+          <td class="check-cell" onclick="this.textContent=this.textContent?'':'✓'"></td>`;
+        tbody.appendChild(tr);
       });
     }
 
-    // Source errors
+    // ── Errors table ──
     document.getElementById('errors-count').textContent = sourceErrors.length + '건';
-    const ecards = document.getElementById('patent-error-cards');
-    ecards.innerHTML = '';
+    const etbody = document.getElementById('patent-errors-tbody');
+    etbody.innerHTML = '';
     if (sourceErrors.length === 0) {
-      ecards.innerHTML = '<p style="font-size:13px;color:#34a853;padding:8px 0">✅ 원문 오류 없음</p>';
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="6" style="text-align:center;color:#34a853;padding:16px">✅ 원문 오류 없음</td>';
+      etbody.appendChild(tr);
     } else {
       sourceErrors.forEach(e => {
-        const card = document.createElement('div');
-        card.className = 'ser-card ' + (e.ser_required ? 'ser-required' : 'ser-note-only');
-        card.innerHTML = `
-          <div class="ser-header">
-            <span class="ser-badge ${e.ser_required ? 'required' : 'info'}">${e.ser_required ? 'SER 필요' : '참고'}</span>
-            <span class="ser-location">${esc(e.location || '')}</span>
-          </div>
-          <div class="ser-text">${esc(e.text || '')}</div>
-          <div class="ser-issue">${esc(e.issue || '')}</div>
-          ${e.ser_note ? `<div class="ser-note-text">SER: ${esc(e.ser_note)}</div>` : ''}`;
-        ecards.appendChild(card);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${esc(String(e.no || ''))}</td>
+          <td>${esc(e.original_jp || '')}</td>
+          <td style="text-align:center">${esc(e.area || '')}</td>
+          <td>${esc(e.issue || '')}</td>
+          <td class="${e.ser_required ? 'ser-req' : ''}" style="text-align:center;font-weight:600">
+            ${e.ser_required ? '필요' : '참고'}</td>
+          <td class="check-cell" onclick="this.textContent=this.textContent?'':'✓'"></td>`;
+        etbody.appendChild(tr);
       });
     }
 
-    // Drawing mismatches
+    // ── Drawing mismatches ──
     const dsec = document.getElementById('patent-drawing-section');
     if (drawingMismatches.length > 0) {
       document.getElementById('drawing-count').textContent = drawingMismatches.length + '건';
@@ -1346,29 +1426,14 @@
       drawingMismatches.forEach(m => {
         const card = document.createElement('div');
         card.className = 'ser-card ser-required';
-        card.innerHTML = `
-          <div class="ser-header">
-            <span class="ser-badge required">불일치</span>
-            <span class="ser-location">${esc(m.location || '')}</span>
-          </div>
-          <div class="correction-row" style="padding:4px 0">
-            <span class="lbl">JP에서</span><span>${esc(m.jp_ref || '')}</span>
-          </div>
-          <div class="correction-row" style="padding:4px 0">
-            <span class="lbl">EN에서</span><span>${esc(m.en_ref || '')}</span>
-          </div>
-          <div class="correction-row" style="padding:4px 0">
-            <span class="lbl">도면</span><span>${esc(m.drawing_ref || '')}</span>
-          </div>
-          <div class="ser-issue">${esc(m.issue || '')}</div>`;
+        card.innerHTML = `<div class="ser-header"><span class="ser-badge required">불일치</span><span class="ser-location">${esc(m.location||'')}</span></div>
+          <div class="ser-issue">JP: ${esc(m.jp_ref||'')} / EN: ${esc(m.en_ref||'')} / 도면: ${esc(m.drawing_ref||'')} — ${esc(m.issue||'')}</div>`;
         dcards.appendChild(card);
       });
       dsec.style.display = 'block';
-    } else {
-      dsec.style.display = 'none';
-    }
+    } else { if(dsec) dsec.style.display = 'none'; }
 
-    // SER verification
+    // ── SER verification ──
     const ssec = document.getElementById('patent-ser-section');
     if (serVerification.length > 0) {
       document.getElementById('ser-count').textContent = serVerification.length + '건';
@@ -1378,18 +1443,13 @@
         const ok = s.status === 'OK';
         const card = document.createElement('div');
         card.className = 'ser-card ' + (ok ? 'ser-note-only' : 'ser-required');
-        card.innerHTML = `
-          <div class="ser-header">
-            <span class="ser-badge ${ok ? 'info' : 'required'}">${esc(s.status || '')}</span>
-            <span class="ser-location">SER ${esc(String(s.ser_no || ''))} &nbsp; ${esc(s.location || '')}</span>
-          </div>
-          <div class="ser-issue">${esc(s.note || '')}</div>`;
+        card.innerHTML = `<div class="ser-header"><span class="ser-badge ${ok?'info':'required'}">${esc(s.status||'')}</span>
+          <span class="ser-location">SER ${esc(String(s.ser_no||''))} — ${esc(s.location||'')}</span></div>
+          <div class="ser-issue">${esc(s.note||'')}</div>`;
         scards.appendChild(card);
       });
-      ssec.style.display = 'block';
-    } else {
-      ssec.style.display = 'none';
-    }
+      if(ssec) ssec.style.display = 'block';
+    } else { if(ssec) ssec.style.display = 'none'; }
 
     document.getElementById('patent-results').style.display = 'block';
   }

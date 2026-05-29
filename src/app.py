@@ -232,237 +232,279 @@ def api_patent_verify():
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 500
 
-    notes_block = f"\n\n[번역자 메모]\n{notes_text[:2000]}" if notes_text else ""
-    drawing_block = f"\n\n[도면 텍스트 (PDF 추출)]\n{drawing_text[:2000]}" if drawing_text else ""
-    ser_block = f"\n\n[SER 데이터]\n{ser_data[:2000]}" if ser_data else ""
+    notes_block   = f"\n\n[번역자 메모]\n{notes_text[:2000]}"   if notes_text   else ""
+    drawing_block = f"\n\n[도면 PDF 텍스트]\n{drawing_text[:2000]}" if drawing_text else ""
+    ser_block     = f"\n\n[SER 데이터]\n{ser_data[:2000]}"      if ser_data     else ""
+    drawing_instr = """
+8. Drawing callout check: verify that reference numerals in the JP spec match the EN translation
+   and the drawing PDF. Report mismatches in "drawing_mismatches".""" if drawing_text else ""
 
-    drawing_instruction = ""
-    if drawing_text:
-        drawing_instruction = """
-8. 도면 Callout 검증: 명세서의 부호(符号) 번호와 도면 PDF에서 추출된 텍스트의 번호가 일치하는지 확인.
-   불일치 항목은 "drawing_mismatches" 배열에 별도 기재."""
+    prompt = f"""You are a senior patent translation verifier (Japanese→English PCT).
 
-    prompt = f"""You are a senior patent translation verifier specializing in Japanese→English PCT applications.
+Verify sentence-by-sentence, checking:
+1. Strict literal fidelity — no fluency smoothing
+2. Patent terminology accuracy and consistency
+3. Claims conventions: a/an/the articles, "comprising"/"wherein"/"configured to"
+4. Rephrasing, omissions, additions, paraphrasing
+5. Grammar / syntax
+6. Translator notes (if provided)
+7. SER entries: confirm each is correctly handled{drawing_instr}
 
-Verify the translation sentence-by-sentence, checking:
-1. Strict literal fidelity to Japanese (no fluency smoothing)
-2. Patent terminology accuracy and consistency throughout
-3. Claims: articles (a/an/the), "comprising"/"wherein"/"configured to" conventions
-4. Detection of rephrasing, omissions, additions, paraphrasing
-5. Grammar and syntax
-6. Translator notes accuracy (if provided)
-7. SER entries: verify each reported error is correctly handled in translation{drawing_instruction}
-
-Skip sentences/paragraphs with NO issues. All explanations must be in Korean.
-
-Return ONLY this JSON (no other text):
+IMPORTANT OUTPUT FORMAT — return ONLY this JSON, no other text:
 {{
-  "corrections": [
+  "issues": [
     {{
-      "location": "위치 (예: 청구항1, [0017]단락)",
-      "original_jp": "원문 일본어",
-      "existing_en": "기존 번역",
-      "corrected_en": "수정 번역",
-      "reason": "수정 이유 (한국어)",
-      "severity": "심각|보통|경미"
+      "no": <integer segment number from the source, or sequential if unavailable>,
+      "original_jp": "<exact source Japanese sentence>",
+      "existing_en": "<exact current English translation>",
+      "area": "<明細書|請求項|要約書|図面>",
+      "issue": "<comprehensive issue description in Korean — include suggested correction inline>",
+      "corrected_en": "<corrected English translation, or empty string if no change needed>",
+      "severity": "<심각|보통|경미>"
     }}
   ],
   "source_errors": [
     {{
-      "location": "위치",
-      "text": "오류 원문",
-      "issue": "오류 내용 (한국어)",
-      "ser_required": true,
-      "ser_note": "SER 기재 내용 (한국어)"
+      "no": <integer>,
+      "original_jp": "<source text with error>",
+      "area": "<area>",
+      "issue": "<error description in Korean>",
+      "ser_required": <true|false>,
+      "ser_note": "<SER entry text in Korean, or empty string>"
     }}
   ],
   "drawing_mismatches": [
     {{
-      "location": "도면/단락",
-      "jp_ref": "원문 부호 번호",
-      "en_ref": "번역문 부호 번호",
-      "drawing_ref": "도면 부호 번호",
-      "issue": "불일치 내용 (한국어)"
+      "location": "<figure/paragraph>",
+      "jp_ref": "<JP numeral>",
+      "en_ref": "<EN numeral>",
+      "drawing_ref": "<drawing numeral>",
+      "issue": "<mismatch description in Korean>"
     }}
   ],
   "ser_verification": [
     {{
-      "ser_no": "SER 번호",
-      "location": "위치",
-      "status": "OK|미반영|추가필요",
-      "note": "검토 내용 (한국어)"
+      "ser_no": "<SER item number>",
+      "location": "<location>",
+      "status": "<OK|미반영|추가필요>",
+      "note": "<review note in Korean>"
     }}
   ],
-  "summary": "전체 검증 요약 2-3문장 (한국어)"
+  "summary": "<2-3 sentence overall summary in Korean>"
 }}
 
-[원문 (일본어)]
+Omit sentences/paragraphs with no issues.
+
+[原文 (日本語)]
 {source_text[:6000]}
 
-[번역문 (영어)]
+[訳文 (English)]
 {translation_text[:6000]}{notes_block}{drawing_block}{ser_block}"""
 
     raw = translator._call_api(
-        system=[{
+        system=[{{
             "type": "text",
             "text": (
                 "You are a senior patent translation verifier with deep expertise in "
                 "Japanese PCT applications and US/EP patent drafting conventions. "
                 "Respond only with the requested JSON object."
             ),
-            "cache_control": {"type": "ephemeral"},
-        }],
-        messages=[{"role": "user", "content": prompt}],
+            "cache_control": {{"type": "ephemeral"}},
+        }}],
+        messages=[{{"role": "user", "content": prompt}}],
     )
 
     try:
-        match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+        match = _re.search(r'\{{.*\}}', raw, _re.DOTALL)
         result = json.loads(match.group() if match else raw)
         return jsonify(result)
     except Exception:
-        return jsonify({"error": f"응답 파싱 오류: {raw[:300]}"}), 500
+        return jsonify({{"error": f"응답 파싱 오류: {raw[:300]}"}}), 500
 
 
 @app.route("/api/patent-report", methods=["POST"])
 def api_patent_report():
-    """Generate a DOCX verification report from patent-verify results."""
+    """Generate reports (DOCX + XLSX) from patent-verify results."""
     data = request.get_json(force=True)
-    corrections = data.get("corrections", [])
+    fmt = data.get("format", "xlsx")   # "xlsx" or "docx"
+    issues = data.get("issues", [])
     source_errors = data.get("source_errors", [])
     drawing_mismatches = data.get("drawing_mismatches", [])
     ser_verification = data.get("ser_verification", [])
     summary = data.get("summary", "")
     filenames = data.get("filenames", {})
 
-    try:
-        import docx
-        from docx.enum.text import WD_ALIGN_PARAGRAPH
-        from docx.shared import Pt, RGBColor
-    except ImportError:
-        return jsonify({"error": "python-docx not installed"}), 500
+    if fmt == "xlsx":
+        return _make_xlsx_report(issues, source_errors, drawing_mismatches, ser_verification, summary, filenames)
+    return _make_docx_report(issues, source_errors, drawing_mismatches, ser_verification, summary, filenames)
+
+
+def _make_xlsx_report(issues, source_errors, drawing_mismatches, ser_verification, summary, filenames):
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+
+    # ── 検証結果 sheet ──
+    ws = wb.active
+    ws.title = "検証結果"
+
+    HDR_FILL   = PatternFill("solid", fgColor="1A73E8")
+    HDR_FONT   = Font(bold=True, color="FFFFFF", size=10)
+    THIN       = Side(style="thin", color="DADCE0")
+    BORDER     = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
+    WRAP       = Alignment(wrap_text=True, vertical="top")
+    SEV_FILLS  = {
+        "심각": PatternFill("solid", fgColor="FCE8E6"),
+        "보통": PatternFill("solid", fgColor="FEF7E0"),
+        "경미": PatternFill("solid", fgColor="E6F4EA"),
+    }
+
+    headers = ["No", "原文", "訳文", "エリア", "指摘事項", "修正訳文", "심각도", "確認済"]
+    col_widths = [6, 40, 40, 10, 60, 40, 8, 8]
+
+    for c, (h, w) in enumerate(zip(headers, col_widths), 1):
+        cell = ws.cell(1, c, h)
+        cell.font = HDR_FONT
+        cell.fill = HDR_FILL
+        cell.alignment = WRAP
+        cell.border = BORDER
+        ws.column_dimensions[get_column_letter(c)].width = w
+
+    ws.row_dimensions[1].height = 20
+
+    for i, item in enumerate(issues, 2):
+        sev = item.get("severity", "경미")
+        vals = [
+            item.get("no", i - 1),
+            item.get("original_jp", ""),
+            item.get("existing_en", ""),
+            item.get("area", ""),
+            item.get("issue", ""),
+            item.get("corrected_en", ""),
+            sev,
+            "",
+        ]
+        fill = SEV_FILLS.get(sev)
+        for c, v in enumerate(vals, 1):
+            cell = ws.cell(i, c, v)
+            cell.alignment = WRAP
+            cell.border = BORDER
+            if fill and c in (1, 4, 7, 8):
+                cell.fill = fill
+
+    # ── 原文エラー sheet ──
+    if source_errors:
+        ws2 = wb.create_sheet("原文エラー")
+        hdrs2 = ["No", "原文", "エリア", "エラー内容", "SER必要", "SER記載"]
+        widths2 = [6, 40, 10, 60, 8, 50]
+        for c, (h, w) in enumerate(zip(hdrs2, widths2), 1):
+            cell = ws2.cell(1, c, h)
+            cell.font = HDR_FONT
+            cell.fill = PatternFill("solid", fgColor="EA4335")
+            cell.alignment = WRAP; cell.border = BORDER
+            ws2.column_dimensions[get_column_letter(c)].width = w
+        for i, e in enumerate(source_errors, 2):
+            for c, v in enumerate([
+                e.get("no", i-1), e.get("original_jp",""), e.get("area",""),
+                e.get("issue",""), "✓" if e.get("ser_required") else "", e.get("ser_note","")
+            ], 1):
+                cell = ws2.cell(i, c, v); cell.alignment = WRAP; cell.border = BORDER
+
+    # ── SER検証 sheet ──
+    if ser_verification:
+        ws3 = wb.create_sheet("SER検証")
+        hdrs3 = ["SER No.", "位置", "ステータス", "検討内容"]
+        widths3 = [10, 20, 12, 70]
+        for c, (h, w) in enumerate(zip(hdrs3, widths3), 1):
+            cell = ws3.cell(1, c, h)
+            cell.font = HDR_FONT
+            cell.fill = PatternFill("solid", fgColor="34A853")
+            cell.alignment = WRAP; cell.border = BORDER
+            ws3.column_dimensions[get_column_letter(c)].width = w
+        for i, s in enumerate(ser_verification, 2):
+            for c, v in enumerate([s.get("ser_no",""), s.get("location",""), s.get("status",""), s.get("note","")], 1):
+                cell = ws3.cell(i, c, v); cell.alignment = WRAP; cell.border = BORDER
+
+    # ── 図面不一致 sheet ──
+    if drawing_mismatches:
+        ws4 = wb.create_sheet("図面不一致")
+        hdrs4 = ["位置", "JP符号", "EN符号", "図面符号", "内容"]
+        widths4 = [15, 12, 12, 12, 60]
+        for c, (h, w) in enumerate(zip(hdrs4, widths4), 1):
+            cell = ws4.cell(1, c, h)
+            cell.font = HDR_FONT
+            cell.fill = PatternFill("solid", fgColor="F9AB00")
+            cell.alignment = WRAP; cell.border = BORDER
+            ws4.column_dimensions[get_column_letter(c)].width = w
+        for i, m in enumerate(drawing_mismatches, 2):
+            for c, v in enumerate([m.get("location",""), m.get("jp_ref",""), m.get("en_ref",""), m.get("drawing_ref",""), m.get("issue","")], 1):
+                cell = ws4.cell(i, c, v); cell.alignment = WRAP; cell.border = BORDER
+
+    buf = io.BytesIO()
+    wb.save(buf); buf.seek(0)
+    return send_file(buf,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True, download_name="번역검증보고서.xlsx")
+
+
+def _make_docx_report(issues, source_errors, drawing_mismatches, ser_verification, summary, filenames):
+    import docx
+    from docx.shared import RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
 
     doc = docx.Document()
-
-    # Title
-    title = doc.add_heading("특허 번역 검증 보고서", 0)
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-    # File info
+    doc.add_heading("特許翻訳検証報告書 / 특허 번역 검증 보고서", 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
     if filenames:
-        doc.add_paragraph(f"원문: {filenames.get('source', '-')}")
-        doc.add_paragraph(f"번역문: {filenames.get('translation', '-')}")
-        if filenames.get('notes'):
-            doc.add_paragraph(f"번역자 메모: {filenames['notes']}")
-        if filenames.get('drawing'):
-            doc.add_paragraph(f"도면: {filenames['drawing']}")
-        if filenames.get('ser'):
-            doc.add_paragraph(f"SER: {filenames['ser']}")
-
-    # Summary
-    doc.add_heading("검증 요약", 1)
+        for k, v in filenames.items():
+            if v: doc.add_paragraph(f"{k}: {v}")
+    doc.add_heading("検証要約 / 검증 요약", 1)
     doc.add_paragraph(summary or "—")
 
-    SEV_KO = {"심각": "Critical", "보통": "Major", "경미": "Minor"}
+    def _hdr_cell(cell, text, rgb_hex):
+        cell.text = text
+        run = cell.paragraphs[0].runs[0]
+        run.bold = True; run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+        from docx.oxml.ns import qn; from docx.oxml import OxmlElement
+        shd = OxmlElement("w:shd")
+        shd.set(qn("w:val"),"clear"); shd.set(qn("w:color"),"auto"); shd.set(qn("w:fill"), rgb_hex)
+        cell._tc.get_or_add_tcPr().append(shd)
 
-    def _add_table_header(table, headers, bg="1a73e8"):
-        row = table.rows[0]
-        for i, h in enumerate(headers):
-            cell = row.cells[i]
-            cell.text = h
-            run = cell.paragraphs[0].runs[0]
-            run.bold = True
-            run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
-            from docx.oxml.ns import qn
-            from docx.oxml import OxmlElement
-            tc_pr = cell._tc.get_or_add_tcPr()
-            shd = OxmlElement('w:shd')
-            shd.set(qn('w:val'), 'clear')
-            shd.set(qn('w:color'), 'auto')
-            shd.set(qn('w:fill'), bg)
-            tc_pr.append(shd)
-
-    # Corrections
-    doc.add_heading(f"수정 제안 ({len(corrections)}건)", 1)
-    if corrections:
-        tbl = doc.add_table(rows=1, cols=6)
-        tbl.style = "Table Grid"
-        _add_table_header(tbl, ["위치", "원문(JP)", "기존 번역", "수정 번역", "수정 이유", "심각도"])
-        for c in corrections:
+    doc.add_heading(f"指摘事項一覧 / 지적사항 ({len(issues)}건)", 1)
+    if issues:
+        tbl = doc.add_table(rows=1, cols=7); tbl.style = "Table Grid"
+        for i, h in enumerate(["No","原文","訳文","エリア","指摘事項","修正訳文","심각도"]):
+            _hdr_cell(tbl.rows[0].cells[i], h, "1A73E8")
+        for item in issues:
             r = tbl.add_row().cells
-            r[0].text = c.get("location", "")
-            r[1].text = c.get("original_jp", "")
-            r[2].text = c.get("existing_en", "")
-            r[3].text = c.get("corrected_en", "")
-            r[4].text = c.get("reason", "")
-            sev = c.get("severity", "경미")
-            r[5].text = sev
-            color = {"심각": RGBColor(0xC5, 0x22, 0x1F),
-                     "보통": RGBColor(0xB0, 0x60, 0x00),
-                     "경미": RGBColor(0x1E, 0x7E, 0x34)}.get(sev)
-            if color:
-                for para in r[5].paragraphs:
-                    for run in para.runs:
-                        run.font.color.rgb = color
+            r[0].text = str(item.get("no",""))
+            r[1].text = item.get("original_jp","")
+            r[2].text = item.get("existing_en","")
+            r[3].text = item.get("area","")
+            r[4].text = item.get("issue","")
+            r[5].text = item.get("corrected_en","")
+            r[6].text = item.get("severity","")
     else:
-        doc.add_paragraph("수정 제안 없음")
+        doc.add_paragraph("지적사항 없음")
 
-    # Source errors
-    doc.add_heading(f"원문 오류 / SER ({len(source_errors)}건)", 1)
+    doc.add_heading(f"原文エラー / 원문 오류 ({len(source_errors)}건)", 1)
     if source_errors:
-        tbl = doc.add_table(rows=1, cols=5)
-        tbl.style = "Table Grid"
-        _add_table_header(tbl, ["위치", "오류 원문", "오류 내용", "SER 필요", "SER 기재 내용"], "ea4335")
+        tbl = doc.add_table(rows=1, cols=5); tbl.style = "Table Grid"
+        for i, h in enumerate(["No","原文","エリア","エラー内容","SER"]):
+            _hdr_cell(tbl.rows[0].cells[i], h, "EA4335")
         for e in source_errors:
             r = tbl.add_row().cells
-            r[0].text = e.get("location", "")
-            r[1].text = e.get("text", "")
-            r[2].text = e.get("issue", "")
-            r[3].text = "필요" if e.get("ser_required") else "참고"
-            r[4].text = e.get("ser_note", "")
+            r[0].text = str(e.get("no","")); r[1].text = e.get("original_jp","")
+            r[2].text = e.get("area",""); r[3].text = e.get("issue","")
+            r[4].text = "필요" if e.get("ser_required") else "참고"
     else:
         doc.add_paragraph("원문 오류 없음")
 
-    # Drawing mismatches
-    if drawing_mismatches:
-        doc.add_heading(f"도면 Callout 불일치 ({len(drawing_mismatches)}건)", 1)
-        tbl = doc.add_table(rows=1, cols=5)
-        tbl.style = "Table Grid"
-        _add_table_header(tbl, ["위치", "JP 부호", "EN 부호", "도면 부호", "내용"], "f9ab00")
-        for m in drawing_mismatches:
-            r = tbl.add_row().cells
-            r[0].text = m.get("location", "")
-            r[1].text = m.get("jp_ref", "")
-            r[2].text = m.get("en_ref", "")
-            r[3].text = m.get("drawing_ref", "")
-            r[4].text = m.get("issue", "")
-
-    # SER verification
-    if ser_verification:
-        doc.add_heading(f"SER 검증 ({len(ser_verification)}건)", 1)
-        tbl = doc.add_table(rows=1, cols=4)
-        tbl.style = "Table Grid"
-        _add_table_header(tbl, ["SER No.", "위치", "상태", "검토 내용"], "34a853")
-        for s in ser_verification:
-            r = tbl.add_row().cells
-            r[0].text = str(s.get("ser_no", ""))
-            r[1].text = s.get("location", "")
-            r[2].text = s.get("status", "")
-            r[3].text = s.get("note", "")
-
-    buf = io.BytesIO()
-    doc.save(buf)
-    buf.seek(0)
-    return send_file(
-        buf,
+    buf = io.BytesIO(); doc.save(buf); buf.seek(0)
+    return send_file(buf,
         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        as_attachment=True,
-        download_name="번역검증보고서.docx",
-    )
-
-
-@app.route("/api/langs")
-def api_langs():
-    return jsonify(SUPPORTED_LANGUAGES)
+        as_attachment=True, download_name="번역검증보고서.docx")
 
 
 if __name__ == "__main__":
