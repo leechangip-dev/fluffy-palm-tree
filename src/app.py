@@ -302,24 +302,24 @@ Omit sentences/paragraphs with no issues.
 {translation_text[:6000]}{notes_block}{drawing_block}{ser_block}"""
 
     raw = translator._call_api(
-        system=[{{
+        system=[{
             "type": "text",
             "text": (
                 "You are a senior patent translation verifier with deep expertise in "
                 "Japanese PCT applications and US/EP patent drafting conventions. "
                 "Respond only with the requested JSON object."
             ),
-            "cache_control": {{"type": "ephemeral"}},
-        }}],
-        messages=[{{"role": "user", "content": prompt}}],
+            "cache_control": {"type": "ephemeral"},
+        }],
+        messages=[{"role": "user", "content": prompt}],
     )
 
     try:
-        match = _re.search(r'\{{.*\}}', raw, _re.DOTALL)
+        match = _re.search(r'\{.*\}', raw, _re.DOTALL)
         result = json.loads(match.group() if match else raw)
         return jsonify(result)
     except Exception:
-        return jsonify({{"error": f"응답 파싱 오류: {raw[:300]}"}}), 500
+        return jsonify({"error": f"응답 파싱 오류: {raw[:300]}"}), 500
 
 
 @app.route("/api/patent-report", methods=["POST"])
