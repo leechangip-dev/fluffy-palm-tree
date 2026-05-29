@@ -38,10 +38,10 @@ if "%ANTHROPIC_API_KEY%"=="" (
 )
 
 :: ── Install packages (skip if already installed) ──
-python -c "import anthropic,flask,docx,fitz,openpyxl" >nul 2>&1
+python -c "import anthropic,flask,docx,fitz,openpyxl,pptx" >nul 2>&1
 if errorlevel 1 (
     echo Installing packages...
-    pip install anthropic pyyaml flask python-docx pymupdf openpyxl -q
+    pip install anthropic pyyaml flask python-docx pymupdf openpyxl python-pptx -q
     if errorlevel 1 (
         echo [ERROR] Package installation failed.
         pause

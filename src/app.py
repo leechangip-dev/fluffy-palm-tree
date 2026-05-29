@@ -42,23 +42,61 @@ def _get_validator(with_translator: bool = False) -> TranslationValidator:
 
 # ── File text extraction ──────────────────────────────────────────────────────
 
+def _detect_format(data: bytes) -> str:
+    """Detect actual file format from magic bytes."""
+    if data[:4] == b'%PDF':
+        return 'pdf'
+    if data[:4] in (b'PK\x03\x04', b'PK\x05\x06', b'PK\x07\x08'):
+        # ZIP-based: OOXML family — peek at [Content_Types].xml to distinguish
+        import zipfile
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as zf:
+                names = zf.namelist()
+            if any('slide' in n for n in names):
+                return 'pptx'
+            if any('word/' in n for n in names):
+                return 'docx'
+            if any('xl/' in n for n in names):
+                return 'xlsx'
+        except Exception:
+            pass
+        return 'zip'
+    return 'unknown'
+
+
 def _extract_docx(data: bytes) -> str:
     import docx
     doc = docx.Document(io.BytesIO(data))
+    parts = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+    for tbl in doc.tables:
+        for row in tbl.rows:
+            row_text = " | ".join(c.text.strip() for c in row.cells if c.text.strip())
+            if row_text:
+                parts.append(row_text)
+    return "\n".join(parts)
+
+
+def _extract_pptx(data: bytes) -> str:
+    from pptx import Presentation
+    prs = Presentation(io.BytesIO(data))
     parts = []
-    for para in doc.paragraphs:
-        t = para.text.strip()
-        if t:
-            parts.append(t)
+    for i, slide in enumerate(prs.slides, 1):
+        slide_parts = [f"[Slide {i}]"]
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                for para in shape.text_frame.paragraphs:
+                    t = para.text.strip()
+                    if t:
+                        slide_parts.append(t)
+        if len(slide_parts) > 1:
+            parts.extend(slide_parts)
     return "\n".join(parts)
 
 
 def _extract_pdf(data: bytes) -> str:
     import fitz
     doc = fitz.open(stream=data, filetype="pdf")
-    pages = []
-    for page in doc:
-        pages.append(page.get_text())
+    pages = [page.get_text() for page in doc]
     doc.close()
     return "\n".join(pages)
 
@@ -84,13 +122,33 @@ def _extract_xlsx_ser(data: bytes) -> list[dict]:
 
 
 def _extract_text(filename: str, data: bytes) -> str:
+    """Extract plain text, using magic-byte detection to handle misnamed files."""
     ext = Path(filename).suffix.lower()
+
+    # Always trust magic bytes over extension
+    fmt = _detect_format(data)
+    if fmt == 'pdf':
+        return _extract_pdf(data)
+    if fmt == 'pptx':
+        return _extract_pptx(data)
+    if fmt == 'docx':
+        return _extract_docx(data)
+    if fmt == 'xlsx':
+        rows = _extract_xlsx_ser(data)
+        return json.dumps(rows, ensure_ascii=False, indent=2)
+
+    # Fall back to extension
     if ext in (".txt", ".md"):
         return data.decode("utf-8", errors="replace")
     if ext == ".docx":
         return _extract_docx(data)
+    if ext == ".pptx":
+        return _extract_pptx(data)
     if ext == ".pdf":
         return _extract_pdf(data)
+    if ext in (".xlsx", ".xls"):
+        rows = _extract_xlsx_ser(data)
+        return json.dumps(rows, ensure_ascii=False, indent=2)
     return data.decode("utf-8", errors="replace")
 
 
