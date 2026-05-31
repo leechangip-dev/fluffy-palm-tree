@@ -199,6 +199,21 @@
     }
     .btn-file-clear:hover { color: #ea4335; }
 
+    /* ── Drawing translation panel ── */
+    .drawing-trans-panel {
+      border-top: 1px solid #dadce0; padding: 12px 16px;
+    }
+    .drawing-trans-header {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;
+    }
+    .drawing-trans-header span { font-weight: 500; font-size: 14px; }
+    .drawing-trans-preview {
+      font-size: 12px; font-family: 'Courier New', monospace;
+      max-height: 200px; overflow-y: auto;
+      border: 1px solid #dadce0; border-radius: 4px;
+      padding: 8px 12px; background: #f8f9fa; white-space: pre;
+    }
+
     /* ── Source panel file drop ── */
     .source-panel { position: relative; }
     .src-drop-overlay {
@@ -650,6 +665,8 @@
       <div class="action-bar">
         <button class="btn-primary" id="translate-btn" onclick="doTranslate()">번역하기</button>
         <button class="btn-secondary" id="validate-after-btn" disabled onclick="doValidateAfter()">검증하기</button>
+        <button class="btn-secondary" id="drawing-translate-btn" style="display:none"
+                onclick="doTranslateDrawing()">📐 도면 번역</button>
         <button class="btn-stop" id="stop-btn" onclick="doStop()">■ 중지</button>
         <span class="spinner" id="spinner"></span>
         <label class="quality-check-label" title="API 크레딧을 사용합니다">
@@ -657,6 +674,19 @@
           품질 점수 확인
         </label>
         <span class="shortcut-hint">Ctrl+Enter로 번역</span>
+      </div>
+
+      <!-- Drawing translation results -->
+      <div class="drawing-trans-panel" id="drawing-trans-panel" style="display:none">
+        <div class="drawing-trans-header">
+          <span>📐 도면 번역 결과</span>
+          <span id="drawing-trans-count" style="font-size:13px;color:#5f6368"></span>
+          <button class="btn-secondary" style="font-size:12px;padding:4px 12px"
+                  onclick="downloadDrawingTxt()">TXT</button>
+          <button class="btn-secondary" style="font-size:12px;padding:4px 12px"
+                  onclick="downloadDrawingXlsx(event)">Excel</button>
+        </div>
+        <div class="drawing-trans-preview" id="drawing-trans-preview"></div>
       </div>
 
       <!-- Inline validation results -->
@@ -914,10 +944,13 @@
   document.getElementById('clear-btn').addEventListener('click', () => {
     srcFiles = [];
     renderSrcChips();
+    lastDrawingResult = null;
     document.getElementById('source-text').value = '';
     document.getElementById('char-count').textContent = '0';
     document.getElementById('result-text').value = '';
     document.getElementById('context-input').value = '';
+    document.getElementById('drawing-translate-btn').style.display = 'none';
+    document.getElementById('drawing-trans-panel').style.display = 'none';
     lastResults = {};
     hideError();
     document.getElementById('validate-after-btn').disabled = true;
@@ -1684,6 +1717,110 @@
       if (instrFiles.length)
         ctx += instrFiles.map(f => f.text).join('\n\n');
       document.getElementById('context-input').value = ctx.trim();
+    }
+
+    // Show/hide drawing translate button
+    const hasGraphicReady = srcFiles.some(f => f.role === 'src_graphic' && !f.loading && f.text);
+    document.getElementById('drawing-translate-btn').style.display = hasGraphicReady ? '' : 'none';
+  }
+
+  // ── Drawing translation ─────────────────────────────────────────────────────
+
+  let lastDrawingResult = null;
+
+  async function doTranslateDrawing() {
+    const graphicFiles = srcFiles.filter(f => f.role === 'src_graphic' && !f.loading && f.text);
+    if (!graphicFiles.length) { showError('소스 그래픽 파일이 없습니다.'); return; }
+
+    const btn = document.getElementById('drawing-translate-btn');
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = '번역 중...';
+    document.getElementById('drawing-trans-panel').style.display = 'none';
+    hideError();
+
+    const targetLangs = [...selectedTargets];
+    const sourceLang  = document.getElementById('source-lang-select').value || 'ja';
+
+    try {
+      const resp = await fetch('/api/translate-drawing', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          drawing_texts: graphicFiles.map(f => ({ name: f.file.name, text: f.text })),
+          target_langs: targetLangs,
+          source_lang: sourceLang,
+        }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || data.error) { showError(data.error || '도면 번역 실패'); return; }
+      lastDrawingResult = data;
+      renderDrawingTransResult(data);
+    } catch (e) {
+      showError('오류: ' + e.message);
+    } finally {
+      btn.disabled = false; btn.textContent = orig;
+    }
+  }
+
+  function renderDrawingTransResult(data) {
+    const items = data.items || [];
+    const langs = data.target_langs || [];
+    const panel   = document.getElementById('drawing-trans-panel');
+    const countEl = document.getElementById('drawing-trans-count');
+    const preview = document.getElementById('drawing-trans-preview');
+
+    if (!items.length) {
+      countEl.textContent = data.message || '도면에서 텍스트를 찾지 못했습니다.';
+      preview.textContent = '';
+      panel.style.display = '';
+      return;
+    }
+
+    countEl.textContent = `${items.length}개 항목`;
+    // Preview: ref [TAB] translations (one lang per column, tab-separated)
+    const lines = items.map(item => {
+      const trans = langs.map(l => item.translations[l] || '').join('\t');
+      return `${item.ref}\t${trans}`;
+    });
+    preview.textContent = lines.join('\n');
+    panel.style.display = '';
+  }
+
+  function downloadDrawingTxt() {
+    if (!lastDrawingResult) return;
+    const items = lastDrawingResult.items || [];
+    const langs  = lastDrawingResult.target_langs || [];
+    // Format: ref [TAB] jp [TAB] translation1 [TAB] translation2 ...
+    // If single target lang → simpler 2-column format (ref [TAB] translation)
+    const lines = items.map(item => {
+      if (langs.length === 1) {
+        return `${item.ref}\t${item.translations[langs[0]] || ''}`;
+      }
+      const trans = langs.map(l => item.translations[l] || '').join('\t');
+      return `${item.ref}\t${item.jp}\t${trans}`;
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '도면번역.txt'; a.click();
+  }
+
+  async function downloadDrawingXlsx(e) {
+    if (!lastDrawingResult) return;
+    const btn = e.currentTarget;
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = '생성 중...';
+    try {
+      const resp = await fetch('/api/drawing-translation-xlsx', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(lastDrawingResult),
+      });
+      if (!resp.ok) { showError('Excel 생성 실패'); return; }
+      const blob = await resp.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = '도면번역.xlsx'; a.click();
+    } finally {
+      btn.disabled = false; btn.textContent = orig;
     }
   }
 

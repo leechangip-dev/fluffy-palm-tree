@@ -12,7 +12,7 @@ from pathlib import Path
 from flask import Flask, jsonify, render_template, request, send_file
 
 sys.path.insert(0, str(Path(__file__).parent))
-from translator import SUPPORTED_LANGUAGES, Translator
+from translator import SUPPORTED_LANGUAGES, Translator, _validate_lang
 from validator import TranslationValidator
 
 app = Flask(__name__)
@@ -718,6 +718,132 @@ def _make_corrected_translation_docx(translation_text: str, corrections: list[di
         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         as_attachment=True,
         download_name="수정본_번역문.docx")
+
+
+@app.route("/api/translate-drawing", methods=["POST"])
+def api_translate_drawing():
+    """Parse drawing reference numerals + translate captions to target languages."""
+    data = request.get_json(force=True)
+    drawing_texts: list = data.get("drawing_texts", [])   # [{name, text}]
+    target_langs: list  = data.get("target_langs", ["en"])
+    source_lang: str    = data.get("source_lang", "ja")
+
+    if not drawing_texts:
+        return jsonify({"error": "도면 텍스트가 필요합니다"}), 400
+
+    try:
+        translator = _get_translator()
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 500
+
+    validated_langs = [_validate_lang(l) for l in target_langs if l]
+
+    # ── Step 1: parse drawing text → (ref, jp) pairs ──────────────────────────
+    combined = "\n\n".join(
+        f"[{d['name']}]\n{d['text']}" if len(drawing_texts) > 1 else d["text"]
+        for d in drawing_texts
+    )
+
+    parse_prompt = (
+        "Analyze the patent drawing text below. Extract all reference numeral + Japanese label pairs.\n\n"
+        "Reference numerals (図面符号) are: integers (1, 10, 100), alphanumeric codes (1a, 1b, 2A, S1), "
+        "or uppercase letters (A, B). They typically appear beside or before Japanese descriptive text.\n\n"
+        "Output ONLY lines in this exact format (tab-separated, no header, no blank lines):\n"
+        "<numeral>\\t<Japanese text>\n\n"
+        "Rules:\n"
+        "- Omit any numeral with no clear Japanese text\n"
+        "- Keep numerals exactly as they appear\n"
+        "- Deduplicate: emit each numeral only once (first occurrence)\n\n"
+        f"Drawing text:\n{combined[:5000]}"
+    )
+
+    raw_pairs = translator._call_api(
+        system=[{"type": "text",
+                 "text": "You extract reference numeral / Japanese label pairs from patent drawings. "
+                         "Output tab-separated pairs only, nothing else.",
+                 "cache_control": {"type": "ephemeral"}}],
+        messages=[{"role": "user", "content": parse_prompt}],
+    )
+
+    pairs: list[dict] = []
+    seen: set[str] = set()
+    for line in raw_pairs.strip().splitlines():
+        if "\t" in line:
+            ref, jp = line.split("\t", 1)
+            ref, jp = ref.strip(), jp.strip()
+            if ref and jp and ref not in seen:
+                pairs.append({"ref": ref, "jp": jp})
+                seen.add(ref)
+
+    if not pairs:
+        return jsonify({"items": [], "target_langs": validated_langs,
+                        "message": "도면에서 참조번호+텍스트 쌍을 찾지 못했습니다."})
+
+    # ── Step 2: translate each JP label to every target lang (parallel) ────────
+    items: list[dict] = [{"ref": p["ref"], "jp": p["jp"], "translations": {}} for p in pairs]
+
+    def _translate_one(pair_idx: int, lang: str):
+        text = translator.translate(pairs[pair_idx]["jp"], lang, source_lang)
+        return pair_idx, lang, text
+
+    tasks = [(i, lang) for i in range(len(pairs)) for lang in validated_langs]
+    with ThreadPoolExecutor(max_workers=min(len(tasks), 8)) as pool:
+        futures = {pool.submit(_translate_one, i, lang): (i, lang) for i, lang in tasks}
+        for fut in as_completed(futures):
+            try:
+                i, lang, text = fut.result()
+                items[i]["translations"][lang] = text
+            except Exception as exc:
+                i, lang = futures[fut]
+                items[i]["translations"][lang] = f"[오류: {exc}]"
+
+    return jsonify({"items": items, "target_langs": validated_langs})
+
+
+@app.route("/api/drawing-translation-xlsx", methods=["POST"])
+def api_drawing_translation_xlsx():
+    """Generate xlsx from drawing translation items."""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    data = request.get_json(force=True)
+    items: list       = data.get("items", [])
+    target_langs: list = data.get("target_langs", ["en"])
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "도면번역"
+
+    HDR_FILL = PatternFill("solid", fgColor="1A73E8")
+    HDR_FONT = Font(bold=True, color="FFFFFF", size=10)
+    THIN     = Side(style="thin", color="DADCE0")
+    BORDER   = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
+    WRAP     = Alignment(wrap_text=True, vertical="top")
+
+    lang_names = {k: v for k, v in SUPPORTED_LANGUAGES.items()}
+    headers = ["도면 부호", "日本語 原文"] + [lang_names.get(l, l.upper()) for l in target_langs]
+    widths  = [12, 40] + [40] * len(target_langs)
+
+    for c, (h, w) in enumerate(zip(headers, widths), 1):
+        cell = ws.cell(1, c, h)
+        cell.font = HDR_FONT; cell.fill = HDR_FILL
+        cell.alignment = WRAP; cell.border = BORDER
+        ws.column_dimensions[get_column_letter(c)].width = w
+    ws.row_dimensions[1].height = 20
+
+    for r, item in enumerate(items, 2):
+        vals = ([item.get("ref", ""), item.get("jp", "")]
+                + [item.get("translations", {}).get(l, "") for l in target_langs])
+        for c, v in enumerate(vals, 1):
+            cell = ws.cell(r, c, v)
+            cell.alignment = WRAP; cell.border = BORDER
+
+    buf = io.BytesIO()
+    wb.save(buf); buf.seek(0)
+    return send_file(buf,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True, download_name="도면번역.xlsx")
 
 
 if __name__ == "__main__":
