@@ -846,6 +846,191 @@ def api_drawing_translation_xlsx():
         as_attachment=True, download_name="도면번역.xlsx")
 
 
+@app.route("/api/patent-verify-batch", methods=["POST"])
+def api_patent_verify_batch():
+    """Submit patent verification as a Batch API job (50% cheaper, async)."""
+    data = request.get_json(force=True)
+    source_text: str = data.get("source_text", "").strip()
+    translation_text: str = data.get("translation_text", "").strip()
+    instruction_text: str = data.get("instruction_text", "").strip()
+    notes_text: str = data.get("notes_text", "").strip()
+    drawing_src_text: str = data.get("drawing_src_text", "").strip()
+    drawing_trl_text: str = data.get("drawing_trl_text", "").strip()
+    ser_data: str = data.get("ser_data", "").strip()
+
+    if not source_text:
+        return jsonify({"error": "원문(일본어) 텍스트가 필요합니다."}), 400
+    if not translation_text:
+        return jsonify({"error": "번역문(영어) 텍스트가 필요합니다."}), 400
+
+    try:
+        translator = _get_translator()
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 500
+
+    instruction_block = f"\n\n[번역지시서]\n{instruction_text[:3000]}" if instruction_text else ""
+    notes_block       = f"\n\n[번역자 메모]\n{notes_text[:2000]}"       if notes_text       else ""
+    drawing_src_block = f"\n\n[原文 図面テキスト (JP Drawing)]\n{drawing_src_text[:2000]}" if drawing_src_text else ""
+    drawing_trl_block = f"\n\n[訳文 図面テキスト (EN Drawing)]\n{drawing_trl_text[:2000]}" if drawing_trl_text else ""
+    ser_block         = f"\n\n[SER 데이터]\n{ser_data[:2000]}"           if ser_data         else ""
+    instruction_instr = """
+0. Translation instructions (번역지시서): strictly apply all terminology rules, style
+   requirements, and client-specific conventions specified in the 번역지시서.""" if instruction_text else ""
+    has_drawing = drawing_src_text or drawing_trl_text
+    drawing_instr = """
+8. Drawing callout check: cross-reference reference numerals between JP spec, EN translation,
+   JP drawing (原文 図面), and EN drawing (訳文 図面). Verify that:
+   a) All JP reference numerals appear correctly in the EN translation.
+   b) JP drawing callouts match the JP spec numerals.
+   c) EN drawing callouts match the EN translation numerals.
+   d) JP and EN drawings use consistent numbering.
+   Report every mismatch in "drawing_mismatches".""" if has_drawing else ""
+
+    prompt = f"""You are a senior patent translation verifier (Japanese→English PCT).
+
+Verify sentence-by-sentence, checking:{instruction_instr}
+1. Strict literal fidelity — no fluency smoothing
+2. Patent terminology accuracy and consistency
+3. Claims conventions: a/an/the articles, "comprising"/"wherein"/"configured to"
+4. Rephrasing, omissions, additions, paraphrasing
+5. Grammar / syntax
+6. Translator notes (if provided)
+7. SER entries: confirm each is correctly handled{drawing_instr}
+
+IMPORTANT OUTPUT FORMAT — return ONLY this JSON, no other text:
+{{
+  "issues": [
+    {{
+      "no": <integer segment number from the source, or sequential if unavailable>,
+      "original_jp": "<exact source Japanese sentence>",
+      "existing_en": "<exact current English translation>",
+      "area": "<明細書|請求項|要約書|図面>",
+      "issue": "<comprehensive issue description in Korean — include suggested correction inline>",
+      "corrected_en": "<corrected English translation, or empty string if no change needed>",
+      "severity": "<심각|보통|경미>"
+    }}
+  ],
+  "source_errors": [
+    {{
+      "no": <integer>,
+      "original_jp": "<source text with error>",
+      "area": "<area>",
+      "issue": "<error description in Korean>",
+      "ser_required": <true|false>,
+      "ser_note": "<SER entry text in Korean, or empty string>"
+    }}
+  ],
+  "drawing_mismatches": [
+    {{
+      "location": "<figure/paragraph reference e.g. FIG.1, 【0023】>",
+      "jp_ref": "<reference numeral in JP spec>",
+      "en_ref": "<reference numeral in EN translation>",
+      "jp_drawing_ref": "<reference numeral in JP drawing, or N/A>",
+      "en_drawing_ref": "<reference numeral in EN drawing, or N/A>",
+      "issue": "<mismatch description in Korean>"
+    }}
+  ],
+  "ser_verification": [
+    {{
+      "ser_no": "<SER item number>",
+      "location": "<location>",
+      "status": "<OK|미반영|추가필요>",
+      "note": "<review note in Korean>"
+    }}
+  ],
+  "summary": "<2-3 sentence overall summary in Korean>"
+}}
+
+Omit sentences/paragraphs with no issues.
+
+[原文 (日本語)]
+{source_text[:6000]}
+
+[訳文 (English)]
+{translation_text[:6000]}{instruction_block}{notes_block}{drawing_src_block}{drawing_trl_block}{ser_block}"""
+
+    try:
+        batch = translator.client.messages.batches.create(
+            requests=[{
+                "custom_id": "patent-verify",
+                "params": {
+                    "model": "claude-sonnet-4-6",
+                    "max_tokens": 8096,
+                    "system": [{
+                        "type": "text",
+                        "text": (
+                            "You are a senior patent translation verifier with deep expertise in "
+                            "Japanese PCT applications and US/EP patent drafting conventions. "
+                            "Respond only with the requested JSON object."
+                        ),
+                        "cache_control": {"type": "ephemeral"},
+                    }],
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+            }]
+        )
+    except Exception as e:
+        return jsonify({"error": f"배치 제출 실패: {e}"}), 500
+
+    return jsonify({"batch_id": batch.id, "status": batch.processing_status})
+
+
+@app.route("/api/batch-status/<batch_id>", methods=["GET"])
+def api_batch_status(batch_id):
+    """Poll Batch API status. Returns parsed result when processing_status == 'ended'."""
+    try:
+        translator = _get_translator()
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 500
+
+    try:
+        batch = translator.client.messages.batches.retrieve(batch_id)
+    except Exception as e:
+        return jsonify({"error": f"배치 조회 실패: {e}"}), 500
+
+    if batch.processing_status != "ended":
+        counts = batch.request_counts
+        return jsonify({
+            "batch_id": batch_id,
+            "status": batch.processing_status,
+            "request_counts": {
+                "processing": getattr(counts, "processing", 0),
+                "succeeded": getattr(counts, "succeeded", 0),
+                "errored": getattr(counts, "errored", 0),
+            },
+        })
+
+    # Batch ended — retrieve results
+    try:
+        results = list(translator.client.messages.batches.results(batch_id))
+    except Exception as e:
+        return jsonify({"batch_id": batch_id, "status": "ended", "error": f"결과 조회 실패: {e}"}), 500
+
+    if not results:
+        return jsonify({"batch_id": batch_id, "status": "ended", "error": "결과 없음"})
+
+    result = results[0]
+    if result.result.type != "succeeded":
+        return jsonify({
+            "batch_id": batch_id, "status": "ended",
+            "error": f"배치 처리 실패: {result.result.type}",
+        })
+
+    raw = next((b.text for b in result.result.message.content if hasattr(b, "text")), None)
+    if not raw:
+        return jsonify({"batch_id": batch_id, "status": "ended", "error": "응답 텍스트 없음"})
+
+    try:
+        match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+        parsed = json.loads(match.group() if match else raw)
+        return jsonify({"batch_id": batch_id, "status": "ended", "result": parsed})
+    except Exception:
+        return jsonify({
+            "batch_id": batch_id, "status": "ended",
+            "error": f"응답 파싱 오류: {raw[:300]}",
+        })
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, host="0.0.0.0", port=port)

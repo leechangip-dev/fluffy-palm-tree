@@ -573,6 +573,20 @@
     .sev-dot-경미  { background:#34a853; }
     .check-cell { text-align:center; font-size:16px; cursor:pointer; user-select:none; }
 
+    /* ── Batch status panel ── */
+    .batch-status-panel {
+      display: none;
+      margin: 8px 16px 0;
+      border: 1px solid #34a853; border-radius: 8px;
+      padding: 14px 16px; background: #e6f4ea;
+    }
+    .batch-status-panel.visible { display: block; }
+    .batch-status-panel .batch-title { font-size: 13px; font-weight: 500; color: #1e7e34; margin-bottom: 6px; }
+    .batch-id-text { font-family: monospace; font-size: 11px; color: #5f6368; word-break: break-all; margin-bottom: 6px; }
+    .batch-status-info { font-size: 13px; color: #202124; margin-bottom: 10px; line-height: 1.5; }
+    .batch-status-panel.error { border-color: #ea4335; background: #fce8e6; }
+    .batch-status-panel.error .batch-title { color: #c5221f; }
+
     /* ── Responsive ── */
     @media (max-width: 640px) {
       .translation-area { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
@@ -767,6 +781,20 @@
       <!-- Error -->
       <div class="patent-error-banner" id="patent-error-banner"></div>
 
+      <!-- Batch status -->
+      <div class="batch-status-panel" id="batch-status-panel">
+        <div class="batch-title">🔄 배치 검증 작업</div>
+        <div class="batch-id-text" id="batch-id-text"></div>
+        <div class="batch-status-info" id="batch-status-info"></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-secondary" style="font-size:12px;padding:5px 14px"
+                  id="batch-check-btn" onclick="checkBatchStatus()">🔍 상태 확인</button>
+          <span class="spinner" id="batch-check-spinner"></span>
+          <button class="btn-secondary" style="font-size:12px;padding:5px 10px;color:#9aa0a6;border-color:#dadce0"
+                  onclick="dismissBatchPanel()" title="패널 닫기">✕</button>
+        </div>
+      </div>
+
       <!-- Action bar -->
       <div class="patent-action-bar">
         <button class="btn-primary" id="patent-verify-btn" onclick="doPatentVerify()">검증 시작</button>
@@ -778,6 +806,11 @@
                 onclick="doPatentCorrectedDocx()">✏️ 수정본 번역문</button>
         <button class="btn-stop" id="patent-stop-btn" onclick="doPatentStop()">■ 중지</button>
         <span class="spinner" id="patent-spinner"></span>
+        <button class="btn-secondary" id="patent-batch-btn" onclick="doPatentVerifyBatch()"
+                style="border-color:#34a853;color:#34a853;margin-left:4px"
+                title="비동기 처리 — API 비용 50% 절감. 결과는 수분~1시간 내 확인 가능합니다.">
+          💰 배치 검증 (50% 절감)
+        </button>
         <span style="font-size:12px;color:#9aa0a6;">원문(JP) + 번역문(EN) 파일이 필요합니다</span>
       </div>
 
@@ -1892,6 +1925,151 @@
     });
   })();
 
+  // ══════════════════════════════════════════════════
+  // BATCH API (patent verify — 50% cost reduction)
+  // ══════════════════════════════════════════════════
+
+  let currentBatchId = null;
+  let batchPollTimer = null;
+
+  function dismissBatchPanel() {
+    if (batchPollTimer) { clearInterval(batchPollTimer); batchPollTimer = null; }
+    document.getElementById('batch-status-panel').classList.remove('visible');
+    localStorage.removeItem('lastBatchId');
+    localStorage.removeItem('lastBatchMeta');
+    currentBatchId = null;
+  }
+
+  async function doPatentVerifyBatch() {
+    hidePatentError();
+    if (patentFiles.some(f => f.loading)) { showPatentError('파일 추출이 완료될 때까지 기다려 주세요.'); return; }
+    const src    = patentFiles.find(f => f.role === 'source');
+    const trl    = patentFiles.find(f => f.role === 'translation');
+    const instr  = patentFiles.filter(f => f.role === 'instruction').map(f => f.text).join('\n\n');
+    const note   = patentFiles.find(f => f.role === 'notes');
+    const drwSrc = patentFiles.find(f => f.role === 'drawing_src');
+    const drwTrl = patentFiles.find(f => f.role === 'drawing_trl');
+    const ser    = patentFiles.find(f => f.role === 'ser');
+    if (!src) { showPatentError('원문(JP) 파일을 추가해 주세요.'); return; }
+    if (!trl) { showPatentError('번역문(EN) 파일을 추가해 주세요.'); return; }
+
+    const btn = document.getElementById('patent-batch-btn');
+    btn.disabled = true; btn.textContent = '제출 중...';
+    const panel = document.getElementById('batch-status-panel');
+    panel.className = 'batch-status-panel';
+    panel.classList.remove('visible');
+
+    try {
+      const resp = await fetch('/api/patent-verify-batch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_text:     src.text,
+          translation_text: trl.text,
+          instruction_text: instr,
+          notes_text:       note   ? note.text   : '',
+          drawing_src_text: drwSrc ? drwSrc.text : '',
+          drawing_trl_text: drwTrl ? drwTrl.text : '',
+          ser_data:         ser    ? ser.text     : '',
+        }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || data.error) { showPatentError(data.error || '배치 제출 실패'); return; }
+
+      currentBatchId = data.batch_id;
+      _showBatchPanel(data.batch_id, '⏳ 배치 작업 제출 완료. 보통 수분~1시간 내 처리됩니다.', false);
+
+      // Persist across page reloads
+      localStorage.setItem('lastBatchId', data.batch_id);
+      localStorage.setItem('lastBatchMeta', JSON.stringify({
+        sourceName: src.file.name,
+        translationName: trl.file.name,
+        translationText: trl.text,
+      }));
+
+      startBatchPolling();
+    } catch (e) {
+      showPatentError('배치 제출 오류: ' + e.message);
+    } finally {
+      btn.disabled = false; btn.textContent = '💰 배치 검증 (50% 절감)';
+    }
+  }
+
+  function _showBatchPanel(batchId, statusMsg, isError) {
+    const panel = document.getElementById('batch-status-panel');
+    document.getElementById('batch-id-text').textContent = 'Batch ID: ' + batchId;
+    document.getElementById('batch-status-info').textContent = statusMsg;
+    panel.className = 'batch-status-panel' + (isError ? ' error' : '');
+    panel.classList.add('visible');
+  }
+
+  function startBatchPolling() {
+    if (batchPollTimer) clearInterval(batchPollTimer);
+    batchPollTimer = setInterval(checkBatchStatus, 15000);
+  }
+
+  async function checkBatchStatus() {
+    if (!currentBatchId) return;
+
+    const checkBtn    = document.getElementById('batch-check-btn');
+    const checkSpinner = document.getElementById('batch-check-spinner');
+    checkBtn.disabled = true;
+    checkSpinner.classList.add('visible');
+
+    try {
+      const resp = await fetch('/api/batch-status/' + encodeURIComponent(currentBatchId));
+      const data = await resp.json();
+
+      if (!resp.ok || data.error) {
+        _showBatchPanel(currentBatchId, '❌ ' + (data.error || '상태 확인 실패'), true);
+        if (batchPollTimer) { clearInterval(batchPollTimer); batchPollTimer = null; }
+        return;
+      }
+
+      if (data.status !== 'ended') {
+        const c = data.request_counts || {};
+        const detail = c.processing != null
+          ? ` (처리 중: ${c.processing}, 완료: ${c.succeeded})`
+          : '';
+        _showBatchPanel(currentBatchId, `⏳ 처리 중${detail}...`, false);
+        return;
+      }
+
+      // Batch ended
+      if (batchPollTimer) { clearInterval(batchPollTimer); batchPollTimer = null; }
+      localStorage.removeItem('lastBatchId');
+
+      if (data.error) {
+        _showBatchPanel(currentBatchId, '❌ ' + data.error, true);
+        return;
+      }
+
+      _showBatchPanel(currentBatchId, '✅ 검증 완료! 결과가 아래에 표시됩니다.', false);
+
+      // Render results using saved metadata
+      const meta = JSON.parse(localStorage.getItem('lastBatchMeta') || '{}');
+      localStorage.removeItem('lastBatchMeta');
+      lastPatentResult = data.result;
+      lastPatentResult._translationText = meta.translationText || '';
+      lastPatentResult._filenames = {
+        source: meta.sourceName || '', translation: meta.translationName || '',
+        notes: '', drawing_src: '', drawing_trl: '', ser: '',
+      };
+      renderPatentResults(data.result);
+      document.getElementById('patent-report-xlsx').style.display = 'inline-flex';
+      document.getElementById('patent-report-docx').style.display = 'inline-flex';
+      const hasCorrectable = (data.result.issues || []).some(
+        i => i.severity === '심각' && i.corrected_en && i.corrected_en.trim()
+      );
+      document.getElementById('patent-corrected-docx').style.display = hasCorrectable ? 'inline-flex' : 'none';
+
+    } catch (e) {
+      _showBatchPanel(currentBatchId, '❌ 오류: ' + e.message, true);
+    } finally {
+      checkBtn.disabled = false;
+      checkSpinner.classList.remove('visible');
+    }
+  }
+
   // ── Init ──
   renderChips();
   renderResultTabs();
@@ -1899,6 +2077,15 @@
   addValPair('en');
   addValPair('ja');
   addValPair('zh');
+
+  // Resume any pending batch job from a previous session
+  (function resumePendingBatch() {
+    const savedId = localStorage.getItem('lastBatchId');
+    if (!savedId) return;
+    currentBatchId = savedId;
+    _showBatchPanel(savedId, '⏳ 이전 배치 작업을 재개합니다...', false);
+    startBatchPolling();
+  })();
 </script>
 </body>
 </html>
