@@ -174,18 +174,25 @@ class Translator:
         target_name = SUPPORTED_LANGUAGES[target_lang]
         source_hint = f" from {SUPPORTED_LANGUAGES[source_lang]}" if source_lang else ""
         context_block = f"\n\nAdditional context: {context}" if context else ""
-        user_prompt = (
-            f"Translate the following text{source_hint} to {target_name}."
-            f"{context_block}\n\nText to translate:\n{text}"
-        )
 
+        # Source text cached so repeated calls with different target langs hit the cache
         result = self._call_api(
             system=[{
                 "type": "text",
                 "text": SYSTEM_PROMPT,
                 "cache_control": {"type": "ephemeral"},
             }],
-            messages=[{"role": "user", "content": user_prompt}],
+            messages=[{"role": "user", "content": [
+                {
+                    "type": "text",
+                    "text": f"Source text{source_hint}:\n{text}",
+                    "cache_control": {"type": "ephemeral"},
+                },
+                {
+                    "type": "text",
+                    "text": f"Translate to {target_name}.{context_block}",
+                },
+            ]}],
         )
 
         if self._cache:

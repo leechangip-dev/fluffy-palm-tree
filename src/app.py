@@ -310,9 +310,10 @@ def api_patent_verify():
    d) JP and EN drawings use consistent numbering.
    Report every mismatch in "drawing_mismatches".""" if has_drawing else ""
 
-    prompt = f"""You are a senior patent translation verifier (Japanese→English PCT).
+    # [原文] cached separately — stable across re-verification rounds on the same patent
+    task_prompt = f"""You are a senior patent translation verifier (Japanese→English PCT).
 
-Verify sentence-by-sentence, checking:{instruction_instr}
+Verify the [原文 (日本語)] above sentence-by-sentence against the [訳文 (English)] below, checking:{instruction_instr}
 1. Strict literal fidelity — no fluency smoothing
 2. Patent terminology accuracy and consistency
 3. Claims conventions: a/an/the articles, "comprising"/"wherein"/"configured to"
@@ -367,9 +368,6 @@ IMPORTANT OUTPUT FORMAT — return ONLY this JSON, no other text:
 
 Omit sentences/paragraphs with no issues.
 
-[原文 (日本語)]
-{source_text[:6000]}
-
 [訳文 (English)]
 {translation_text[:6000]}{instruction_block}{notes_block}{drawing_src_block}{drawing_trl_block}{ser_block}"""
 
@@ -383,7 +381,17 @@ Omit sentences/paragraphs with no issues.
             ),
             "cache_control": {"type": "ephemeral"},
         }],
-        messages=[{"role": "user", "content": prompt}],
+        messages=[{"role": "user", "content": [
+            {
+                "type": "text",
+                "text": f"[原文 (日本語)]\n{source_text[:6000]}",
+                "cache_control": {"type": "ephemeral"},
+            },
+            {
+                "type": "text",
+                "text": task_prompt,
+            },
+        ]}],
     )
 
     try:
@@ -744,25 +752,33 @@ def api_translate_drawing():
         for d in drawing_texts
     )
 
-    parse_prompt = (
-        "Analyze the patent drawing text below. Extract all reference numeral + Japanese label pairs.\n\n"
-        "Reference numerals (図面符号) are: integers (1, 10, 100), alphanumeric codes (1a, 1b, 2A, S1), "
-        "or uppercase letters (A, B). They typically appear beside or before Japanese descriptive text.\n\n"
-        "Output ONLY lines in this exact format (tab-separated, no header, no blank lines):\n"
-        "<numeral>\\t<Japanese text>\n\n"
-        "Rules:\n"
-        "- Omit any numeral with no clear Japanese text\n"
-        "- Keep numerals exactly as they appear\n"
-        "- Deduplicate: emit each numeral only once (first occurrence)\n\n"
-        f"Drawing text:\n{combined[:5000]}"
-    )
-
+    # Drawing text cached — reused if the same drawing is re-translated to additional languages
     raw_pairs = translator._call_api(
         system=[{"type": "text",
                  "text": "You extract reference numeral / Japanese label pairs from patent drawings. "
                          "Output tab-separated pairs only, nothing else.",
                  "cache_control": {"type": "ephemeral"}}],
-        messages=[{"role": "user", "content": parse_prompt}],
+        messages=[{"role": "user", "content": [
+            {
+                "type": "text",
+                "text": f"Drawing text:\n{combined[:5000]}",
+                "cache_control": {"type": "ephemeral"},
+            },
+            {
+                "type": "text",
+                "text": (
+                    "Analyze the patent drawing text above. Extract all reference numeral + Japanese label pairs.\n\n"
+                    "Reference numerals (図面符号) are: integers (1, 10, 100), alphanumeric codes (1a, 1b, 2A, S1), "
+                    "or uppercase letters (A, B). They typically appear beside or before Japanese descriptive text.\n\n"
+                    "Output ONLY lines in this exact format (tab-separated, no header, no blank lines):\n"
+                    "<numeral>\\t<Japanese text>\n\n"
+                    "Rules:\n"
+                    "- Omit any numeral with no clear Japanese text\n"
+                    "- Keep numerals exactly as they appear\n"
+                    "- Deduplicate: emit each numeral only once (first occurrence)"
+                ),
+            },
+        ]}],
     )
 
     pairs: list[dict] = []
@@ -875,17 +891,25 @@ def api_translate_batch():
         target_name = SUPPORTED_LANGUAGES[lang]
         source_hint = f" from {SUPPORTED_LANGUAGES[source_lang]}" if source_lang else ""
         context_block = f"\n\nAdditional context: {context}" if context else ""
-        user_prompt = (
-            f"Translate the following text{source_hint} to {target_name}."
-            f"{context_block}\n\nText to translate:\n{text}"
-        )
+        # Source text cached: Batch API processes requests sequentially, so
+        # the 2nd/3rd/… language hits the cache filled by the first request.
         requests_list.append({
             "custom_id": f"translate-{lang}",
             "params": {
                 "model": "claude-sonnet-4-6",
                 "max_tokens": 8096,
                 "system": [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-                "messages": [{"role": "user", "content": user_prompt}],
+                "messages": [{"role": "user", "content": [
+                    {
+                        "type": "text",
+                        "text": f"Source text{source_hint}:\n{text}",
+                        "cache_control": {"type": "ephemeral"},
+                    },
+                    {
+                        "type": "text",
+                        "text": f"Translate to {target_name}.{context_block}",
+                    },
+                ]}],
             },
         })
 
@@ -972,12 +996,8 @@ def api_validate_batch():
     requests_list = []
     for lang, translated_text in translated_texts.items():
         lang_name = SUPPORTED_LANGUAGES.get(lang, lang.upper())
-        prompt = (
-            f"Evaluate the following translation for completeness and quality.\n\n"
-            f"[Source Text]\n{source_text[:3000]}\n\n"
-            f"[Translation → {lang_name}]\n{translated_text[:3000]}\n\n"
-            f"Respond ONLY with valid JSON:\n{json_template}"
-        )
+        # Source text cached: same source shared across all language validations in the batch.
+        # Batch processes sequentially, so EN→cached, then JA/ZH/… all hit cache.
         requests_list.append({
             "custom_id": f"validate-{lang}",
             "params": {
@@ -988,7 +1008,21 @@ def api_validate_batch():
                     "text": "You are a professional translation quality evaluator. Respond only with the requested JSON.",
                     "cache_control": {"type": "ephemeral"},
                 }],
-                "messages": [{"role": "user", "content": prompt}],
+                "messages": [{"role": "user", "content": [
+                    {
+                        "type": "text",
+                        "text": f"[Source Text]\n{source_text[:3000]}",
+                        "cache_control": {"type": "ephemeral"},
+                    },
+                    {
+                        "type": "text",
+                        "text": (
+                            f"[Translation → {lang_name}]\n{translated_text[:3000]}\n\n"
+                            f"Evaluate the above translation for completeness and quality.\n"
+                            f"Respond ONLY with valid JSON:\n{json_template}"
+                        ),
+                    },
+                ]}],
             },
         })
 
@@ -1108,9 +1142,10 @@ def api_patent_verify_batch():
    d) JP and EN drawings use consistent numbering.
    Report every mismatch in "drawing_mismatches".""" if has_drawing else ""
 
-    prompt = f"""You are a senior patent translation verifier (Japanese→English PCT).
+    # [原文] cached separately — stable across re-verification rounds on the same patent
+    batch_task_prompt = f"""You are a senior patent translation verifier (Japanese→English PCT).
 
-Verify sentence-by-sentence, checking:{instruction_instr}
+Verify the [原文 (日本語)] above sentence-by-sentence against the [訳文 (English)] below, checking:{instruction_instr}
 1. Strict literal fidelity — no fluency smoothing
 2. Patent terminology accuracy and consistency
 3. Claims conventions: a/an/the articles, "comprising"/"wherein"/"configured to"
@@ -1165,9 +1200,6 @@ IMPORTANT OUTPUT FORMAT — return ONLY this JSON, no other text:
 
 Omit sentences/paragraphs with no issues.
 
-[原文 (日本語)]
-{source_text[:6000]}
-
 [訳文 (English)]
 {translation_text[:6000]}{instruction_block}{notes_block}{drawing_src_block}{drawing_trl_block}{ser_block}"""
 
@@ -1187,7 +1219,17 @@ Omit sentences/paragraphs with no issues.
                         ),
                         "cache_control": {"type": "ephemeral"},
                     }],
-                    "messages": [{"role": "user", "content": prompt}],
+                    "messages": [{"role": "user", "content": [
+                        {
+                            "type": "text",
+                            "text": f"[原文 (日本語)]\n{source_text[:6000]}",
+                            "cache_control": {"type": "ephemeral"},
+                        },
+                        {
+                            "type": "text",
+                            "text": batch_task_prompt,
+                        },
+                    ]}],
                 },
             }]
         )

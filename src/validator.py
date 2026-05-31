@@ -148,21 +148,29 @@ class TranslationValidator:
         target_name = SUPPORTED_LANGUAGES.get(target_lang, target_lang)
         source_hint = f"({SUPPORTED_LANGUAGES.get(source_lang, source_lang)} → {target_name})" if source_lang else f"(→ {target_name})"
 
-        prompt = (
-            f"Evaluate the translation quality {source_hint}.\n\n"
-            f"[Source]\n{source_text[:2000]}\n\n"
-            f"[Translation]\n{translated_text[:2000]}\n\n"
-            "Rate on a scale of 1-10 and give one-line feedback in Korean.\n"
-            'Respond ONLY with valid JSON: {"score": <number>, "feedback": "<string>"}'
-        )
-
+        # Source text cached — reused when the same source is validated against multiple translations
         raw = self._translator._call_api(
             system=[{
                 "type": "text",
                 "text": "You are a professional translation quality evaluator. Respond only with the requested JSON.",
                 "cache_control": {"type": "ephemeral"},
             }],
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": [
+                {
+                    "type": "text",
+                    "text": f"[Source]\n{source_text[:2000]}",
+                    "cache_control": {"type": "ephemeral"},
+                },
+                {
+                    "type": "text",
+                    "text": (
+                        f"[Translation → {target_name}]\n{translated_text[:2000]}\n\n"
+                        f"Evaluate the translation quality {source_hint}.\n"
+                        "Rate on a scale of 1-10 and give one-line feedback in Korean.\n"
+                        'Respond ONLY with valid JSON: {"score": <number>, "feedback": "<string>"}'
+                    ),
+                },
+            ]}],
         )
 
         try:
