@@ -278,7 +278,8 @@ def api_patent_verify():
     translation_text: str = data.get("translation_text", "").strip()
     instruction_text: str = data.get("instruction_text", "").strip()
     notes_text: str = data.get("notes_text", "").strip()
-    drawing_text: str = data.get("drawing_text", "").strip()
+    drawing_src_text: str = data.get("drawing_src_text", "").strip()
+    drawing_trl_text: str = data.get("drawing_trl_text", "").strip()
     ser_data: str = data.get("ser_data", "").strip()
 
     if not source_text:
@@ -292,15 +293,22 @@ def api_patent_verify():
         return jsonify({"error": str(e)}), 500
 
     instruction_block = f"\n\n[번역지시서]\n{instruction_text[:3000]}" if instruction_text else ""
-    notes_block   = f"\n\n[번역자 메모]\n{notes_text[:2000]}"   if notes_text   else ""
-    drawing_block = f"\n\n[도면 PDF 텍스트]\n{drawing_text[:2000]}" if drawing_text else ""
-    ser_block     = f"\n\n[SER 데이터]\n{ser_data[:2000]}"      if ser_data     else ""
+    notes_block       = f"\n\n[번역자 메모]\n{notes_text[:2000]}"       if notes_text       else ""
+    drawing_src_block = f"\n\n[原文 図面テキスト (JP Drawing)]\n{drawing_src_text[:2000]}" if drawing_src_text else ""
+    drawing_trl_block = f"\n\n[訳文 図面テキスト (EN Drawing)]\n{drawing_trl_text[:2000]}" if drawing_trl_text else ""
+    ser_block         = f"\n\n[SER 데이터]\n{ser_data[:2000]}"           if ser_data         else ""
     instruction_instr = """
 0. Translation instructions (번역지시서): strictly apply all terminology rules, style
    requirements, and client-specific conventions specified in the 번역지시서.""" if instruction_text else ""
+    has_drawing = drawing_src_text or drawing_trl_text
     drawing_instr = """
-8. Drawing callout check: verify that reference numerals in the JP spec match the EN translation
-   and the drawing PDF. Report mismatches in "drawing_mismatches".""" if drawing_text else ""
+8. Drawing callout check: cross-reference reference numerals between JP spec, EN translation,
+   JP drawing (原文 図面), and EN drawing (訳文 図面). Verify that:
+   a) All JP reference numerals appear correctly in the EN translation.
+   b) JP drawing callouts match the JP spec numerals.
+   c) EN drawing callouts match the EN translation numerals.
+   d) JP and EN drawings use consistent numbering.
+   Report every mismatch in "drawing_mismatches".""" if has_drawing else ""
 
     prompt = f"""You are a senior patent translation verifier (Japanese→English PCT).
 
@@ -338,10 +346,11 @@ IMPORTANT OUTPUT FORMAT — return ONLY this JSON, no other text:
   ],
   "drawing_mismatches": [
     {{
-      "location": "<figure/paragraph>",
-      "jp_ref": "<JP numeral>",
-      "en_ref": "<EN numeral>",
-      "drawing_ref": "<drawing numeral>",
+      "location": "<figure/paragraph reference e.g. FIG.1, 【0023】>",
+      "jp_ref": "<reference numeral in JP spec>",
+      "en_ref": "<reference numeral in EN translation>",
+      "jp_drawing_ref": "<reference numeral in JP drawing, or N/A>",
+      "en_drawing_ref": "<reference numeral in EN drawing, or N/A>",
       "issue": "<mismatch description in Korean>"
     }}
   ],
@@ -362,7 +371,7 @@ Omit sentences/paragraphs with no issues.
 {source_text[:6000]}
 
 [訳文 (English)]
-{translation_text[:6000]}{instruction_block}{notes_block}{drawing_block}{ser_block}"""
+{translation_text[:6000]}{instruction_block}{notes_block}{drawing_src_block}{drawing_trl_block}{ser_block}"""
 
     raw = translator._call_api(
         system=[{
@@ -493,8 +502,8 @@ def _make_xlsx_report(issues, source_errors, drawing_mismatches, ser_verificatio
     # ── 図面不一致 sheet ──
     if drawing_mismatches:
         ws4 = wb.create_sheet("図面不一致")
-        hdrs4 = ["位置", "JP符号", "EN符号", "図面符号", "内容"]
-        widths4 = [15, 12, 12, 12, 60]
+        hdrs4 = ["位置", "JP本文符号", "EN本文符号", "JP図面符号", "EN図面符号", "内容"]
+        widths4 = [15, 12, 12, 12, 12, 55]
         for c, (h, w) in enumerate(zip(hdrs4, widths4), 1):
             cell = ws4.cell(1, c, h)
             cell.font = HDR_FONT
@@ -502,7 +511,10 @@ def _make_xlsx_report(issues, source_errors, drawing_mismatches, ser_verificatio
             cell.alignment = WRAP; cell.border = BORDER
             ws4.column_dimensions[get_column_letter(c)].width = w
         for i, m in enumerate(drawing_mismatches, 2):
-            for c, v in enumerate([m.get("location",""), m.get("jp_ref",""), m.get("en_ref",""), m.get("drawing_ref",""), m.get("issue","")], 1):
+            for c, v in enumerate([
+                m.get("location",""), m.get("jp_ref",""), m.get("en_ref",""),
+                m.get("jp_drawing_ref",""), m.get("en_drawing_ref",""), m.get("issue","")
+            ], 1):
                 cell = ws4.cell(i, c, v); cell.alignment = WRAP; cell.border = BORDER
 
     buf = io.BytesIO()

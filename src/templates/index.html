@@ -687,7 +687,7 @@
         <div class="drop-icon">📂</div>
         <div class="drop-title">파일 또는 폴더를 드래그&드롭</div>
         <div class="drop-hint">
-          🇯🇵 일본어 원문 · 🇺🇸 영어 번역문 · 📝 번역자 메모 · 🖼 도면(PDF/PPTX) · 📊 SER(xlsx)<br>
+          🇯🇵 일본어 원문 · 🇺🇸 영어 번역문 · 📝 번역자 메모 · 🗾 원문도면 · 🖼️ 결과도면 · 📊 SER(xlsx)<br>
           <small>지원 형식: .docx &nbsp;.txt &nbsp;.md &nbsp;.pdf &nbsp;.xlsx &nbsp;.pptx &nbsp;📁 폴더</small>
         </div>
         <div style="margin-top:10px;display:flex;gap:8px;justify-content:center">
@@ -1165,15 +1165,16 @@
   let lastPatentResult = null;
 
   const PATENT_ROLES = [
-    ['source',      '🇯🇵 원문 (JP)'],
-    ['translation', '🇺🇸 번역문 (EN)'],
-    ['instruction', '📋 번역지시서'],
-    ['notes',       '📝 번역자 메모'],
-    ['drawing',     '🖼️ 도면 (PDF)'],
-    ['ser',         '📊 SER (xlsx)'],
-    ['ignore',      '— 제외'],
+    ['source',       '🇯🇵 원문 (JP)'],
+    ['translation',  '🇺🇸 번역문 (EN)'],
+    ['instruction',  '📋 번역지시서'],
+    ['notes',        '📝 번역자 메모'],
+    ['drawing_src',  '🗾 원문 도면 (JP)'],
+    ['drawing_trl',  '🖼️ 결과 도면 (EN)'],
+    ['ser',          '📊 SER (xlsx)'],
+    ['ignore',       '— 제외'],
   ];
-  const ROLE_ICONS = { source:'🇯🇵', translation:'🇺🇸', instruction:'📋', notes:'📝', drawing:'🖼️', ser:'📊', ignore:'📄' };
+  const ROLE_ICONS = { source:'🇯🇵', translation:'🇺🇸', instruction:'📋', notes:'📝', drawing_src:'🗾', drawing_trl:'🖼️', ser:'📊', ignore:'📄' };
 
   function hasJapanese(text) { return /[぀-ヿ一-鿿]/.test(text.slice(0, 800)); }
   function hasEnglish(text) { return /[a-zA-Z]{4,}/.test(text.slice(0, 800)) && !hasJapanese(text); }
@@ -1187,19 +1188,32 @@
     if (SKIP_EXTENSIONS.has(ext)) return 'ignore';
     // Extension-based strong signals
     if (ext === 'xlsx' || ext === 'xls') return 'ser';
-    if (ext === 'pptx' || ext === 'ppt') return 'drawing';
     // Filename keyword patterns (checked before content for speed)
-    if (/\b(jp|jpn|japan|原文|原稿|和文|source)\b/.test(n)) return 'source';
-    if (/\b(en|eng|english|翻訳文|translation)\b/.test(n)) return 'translation';
+    if (/\b(jp|jpn|japan|原文|原稿|和文|source)\b/.test(n) && !/draw|fig|図|도면/.test(n)) return 'source';
+    if (/\b(en|eng|english|翻訳文|translation)\b/.test(n) && !/draw|fig|図|도면/.test(n)) return 'translation';
     if (/指示|指示書|지시|지시서|instruction|brief|guideline|style.?guide|翻訳指示/.test(n)) return 'instruction';
     if (/note|memo|メモ|コメント|메모|remark/.test(n)) return 'notes';
     if (/\bser\b|selfreview|self.?review|error.?list/.test(n)) return 'ser';
-    if (/draw|fig\d|図面|도면|figure/.test(n)) return 'drawing';
-    if (ext === 'pdf') {
-      // PDF: drawing unless content is heavily text (>300 chars without images)
-      return text && text.trim().length > 400 ? 'source' : 'drawing';
+    // Drawing detection — distinguish source vs result by filename hints first
+    const isDrawingName = /draw|fig\d*|図面|도면|figure|dwg/.test(n);
+    const isEnHint = /\b(en|eng|english|英|trl|trans|translated|result|output)\b/.test(n);
+    const isJpHint = /\b(jp|jpn|japan|日|原|src|source|original)\b/.test(n);
+    if (ext === 'pptx' || ext === 'ppt') {
+      // PPTX is almost always JP source drawings
+      return isEnHint ? 'drawing_trl' : 'drawing_src';
     }
-    // Content-based detection
+    if (ext === 'pdf') {
+      const textLen = text ? text.trim().length : 0;
+      if (textLen > 400 && hasJapanese(text)) return 'source';   // text-heavy JP → source doc
+      if (textLen > 400 && hasEnglish(text) && !isDrawingName) return 'translation'; // text-heavy EN → translation doc
+      // Sparse text → drawing; pick src/trl
+      if (isEnHint || (textLen > 0 && hasEnglish(text) && !hasJapanese(text))) return 'drawing_trl';
+      return 'drawing_src';  // default PDF drawing → source
+    }
+    if (isDrawingName) {
+      return isEnHint ? 'drawing_trl' : 'drawing_src';
+    }
+    // Content-based fallback for text files
     if (text && hasJapanese(text)) return 'source';
     if (text && hasEnglish(text)) return 'translation';
     return 'ignore';
@@ -1358,12 +1372,13 @@
   async function doPatentVerify() {
     hidePatentError();
     if (patentFiles.some(f => f.loading)) { showPatentError('파일 추출이 완료될 때까지 기다려 주세요.'); return; }
-    const src  = patentFiles.find(f => f.role === 'source');
-    const trl  = patentFiles.find(f => f.role === 'translation');
-    const instr = patentFiles.filter(f => f.role === 'instruction').map(f => f.text).join('\n\n');
-    const note = patentFiles.find(f => f.role === 'notes');
-    const drw  = patentFiles.find(f => f.role === 'drawing');
-    const ser  = patentFiles.find(f => f.role === 'ser');
+    const src     = patentFiles.find(f => f.role === 'source');
+    const trl     = patentFiles.find(f => f.role === 'translation');
+    const instr   = patentFiles.filter(f => f.role === 'instruction').map(f => f.text).join('\n\n');
+    const note    = patentFiles.find(f => f.role === 'notes');
+    const drwSrc  = patentFiles.find(f => f.role === 'drawing_src');
+    const drwTrl  = patentFiles.find(f => f.role === 'drawing_trl');
+    const ser     = patentFiles.find(f => f.role === 'ser');
     if (!src) { showPatentError('원문(JP) 파일을 추가해 주세요.'); return; }
     if (!trl) { showPatentError('번역문(EN) 파일을 추가해 주세요.'); return; }
 
@@ -1384,7 +1399,8 @@
           translation_text: trl.text,
           instruction_text: instr,
           notes_text: note ? note.text : '',
-          drawing_text: drw ? drw.text : '',
+          drawing_src_text: drwSrc ? drwSrc.text : '',
+          drawing_trl_text: drwTrl ? drwTrl.text : '',
           ser_data: ser ? ser.text : '',
         }),
         signal: currentController.signal,
@@ -1394,7 +1410,9 @@
       lastPatentResult = data;
       lastPatentResult._filenames = {
         source: src.file.name, translation: trl.file.name,
-        notes: note ? note.file.name : '', drawing: drw ? drw.file.name : '',
+        notes: note ? note.file.name : '',
+        drawing_src: drwSrc ? drwSrc.file.name : '',
+        drawing_trl: drwTrl ? drwTrl.file.name : '',
         ser: ser ? ser.file.name : '',
       };
       lastPatentResult._translationText = trl.text;
