@@ -199,6 +199,32 @@
     }
     .btn-file-clear:hover { color: #ea4335; }
 
+    /* ── Source panel file drop ── */
+    .source-panel { position: relative; }
+    .src-drop-overlay {
+      display: none; position: absolute; inset: 0; z-index: 10;
+      background: rgba(232,240,254,.92); border: 2px dashed #1a73e8;
+      border-radius: 4px; align-items: center; justify-content: center;
+      font-size: 17px; font-weight: 500; color: #1a73e8; pointer-events: none;
+    }
+    .src-drop-overlay.visible { display: flex; }
+    .src-chips-bar {
+      display: flex; flex-wrap: wrap; gap: 5px;
+      padding: 7px 12px 5px; border-bottom: 1px solid #f1f3f4;
+    }
+    .src-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: #e8f0fe; border-radius: 14px;
+      padding: 3px 8px 3px 7px; font-size: 12px; color: #1558b0; max-width: 220px;
+    }
+    .src-chip.role-instruction { background: #fff3cd; color: #856404; }
+    .src-chip.role-src_graphic  { background: #d4edda; color: #155724; }
+    .src-chip.loading { opacity: .6; }
+    .src-chip .chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 130px; }
+    .src-chip .chip-role { font-size: 10px; opacity: .65; white-space: nowrap; }
+    .src-chip .chip-rm { background: none; border: none; cursor: pointer; color: inherit; opacity: .5; font-size: 14px; line-height: 1; padding: 0 0 0 2px; }
+    .src-chip .chip-rm:hover { opacity: 1; }
+
     /* ── Action bar ── */
     .action-bar {
       display: flex; align-items: center; gap: 12px;
@@ -581,12 +607,24 @@
 
       <!-- Translation area -->
       <div class="translation-area">
-        <div class="text-panel">
-          <textarea id="source-text" placeholder="번역할 내용을 입력하세요..." rows="10" spellcheck="false"></textarea>
+        <div class="text-panel source-panel" id="source-panel">
+          <!-- Drag-over overlay -->
+          <div class="src-drop-overlay" id="src-drop-overlay">📂 파일 / 폴더를 드롭</div>
+          <!-- Recognised file chips -->
+          <div class="src-chips-bar" id="src-chips-bar" style="display:none"></div>
+          <textarea id="source-text"
+            placeholder="번역할 텍스트를 입력하거나&#10;파일/폴더를 드래그&드롭 ↓" rows="10" spellcheck="false"></textarea>
           <div class="panel-footer">
             <span class="char-count" id="char-count">0</span>
-            <button class="icon-btn" id="clear-btn" title="지우기">✕</button>
+            <div style="display:flex;gap:4px">
+              <button class="icon-btn" title="파일 선택" onclick="document.getElementById('src-file-input').click()">📎</button>
+              <button class="icon-btn" title="폴더 선택" onclick="document.getElementById('src-folder-input').click()">📁</button>
+              <button class="icon-btn" id="clear-btn" title="지우기">✕</button>
+            </div>
           </div>
+          <input type="file" id="src-file-input" multiple
+            accept=".txt,.md,.docx,.pdf,.pptx,.xlsx" style="display:none">
+          <input type="file" id="src-folder-input" multiple webkitdirectory style="display:none">
         </div>
         <div class="divider-v"></div>
         <div class="text-panel">
@@ -601,20 +639,10 @@
 
       <!-- Context / cautions -->
       <div class="context-row">
-        <label for="context-input">⚠️ 번역 주의사항 / 맥락</label>
+        <label for="context-input">⚠️ 주의사항</label>
         <div class="context-input-wrap">
           <textarea id="context-input" rows="2"
-            placeholder="텍스트 입력 또는 파일을 드래그&드롭 / 예: 기술 문서입니다. 전문 용어를 유지해주세요."></textarea>
-          <div class="context-file-bar">
-            <button class="btn-file-pick" onclick="document.getElementById('context-file-input').click()">📎 파일 선택</button>
-            <span class="context-file-hint">또는 파일을 위 칸에 드래그&드롭 (.txt .md .json .yaml)</span>
-            <span class="context-file-name" id="context-file-name">
-              <span id="context-file-label"></span>
-              <button class="btn-file-clear" onclick="clearContextFile()" title="파일 제거">×</button>
-            </span>
-          </div>
-          <input type="file" id="context-file-input" accept=".txt,.md,.json,.yaml,.yml"
-            style="display:none" onchange="handleContextFile(this.files[0])">
+            placeholder="번역 주의사항 / 맥락 — 직접 입력하거나, 작업지시서·메모 파일을 소스 영역에 드롭하면 자동 입력됩니다."></textarea>
         </div>
       </div>
 
@@ -884,9 +912,12 @@
       document.getElementById('source-text').value.length.toLocaleString();
   });
   document.getElementById('clear-btn').addEventListener('click', () => {
+    srcFiles = [];
+    renderSrcChips();
     document.getElementById('source-text').value = '';
     document.getElementById('char-count').textContent = '0';
     document.getElementById('result-text').value = '';
+    document.getElementById('context-input').value = '';
     lastResults = {};
     hideError();
     document.getElementById('validate-after-btn').disabled = true;
@@ -1578,36 +1609,149 @@
       .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  // ── Context file drag & drop ──
-  function handleContextFile(file) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = e => {
-      document.getElementById('context-input').value = e.target.result;
-      document.getElementById('context-file-label').textContent = file.name;
-      document.getElementById('context-file-name').classList.add('visible');
-    };
-    reader.readAsText(file, 'utf-8');
+  // ── Source file drop zone (translate mode) ──
+  let srcFiles = [];
+
+  const SRC_SKIP_EXTS = new Set([
+    'exe','dll','zip','tar','gz','7z','jpg','jpeg','png','gif','bmp',
+    'tiff','mp3','mp4','mov','avi','sys','lnk','ini','ds_store',
+    'xlsx','xls',  // spreadsheets not useful as translation source
+  ]);
+
+  const SRC_ROLE_META = {
+    src_text:    ['📄', '소스 텍스트',  'src_text'],
+    src_graphic: ['🖼️', '소스 그래픽', 'src_graphic'],
+    instruction: ['📋', '작업지시서',   'instruction'],
+  };
+
+  function guessTranslateRole(file, text) {
+    const n = file.name.toLowerCase();
+    const ext = n.split('.').pop();
+    if (SRC_SKIP_EXTS.has(ext)) return 'ignore';
+    if (ext === 'pptx' || ext === 'ppt') return 'src_graphic';
+    if (/指示|指示書|지시|지시서|instruction|brief|guideline|style.?guide|翻訳指示/.test(n)) return 'instruction';
+    if (/note|memo|メモ|코멘트|메모|remark|context|주의|caution/.test(n)) return 'instruction';
+    if (/draw|fig\d*|図面|도면|figure|dwg/.test(n)) return 'src_graphic';
+    if (ext === 'pdf') {
+      return (text && text.trim().length > 300) ? 'src_text' : 'src_graphic';
+    }
+    return 'src_text';  // docx, txt, md, etc.
   }
 
-  function clearContextFile() {
-    document.getElementById('context-file-input').value = '';
-    document.getElementById('context-file-name').classList.remove('visible');
-    document.getElementById('context-input').value = '';
-  }
-
-  (function setupContextDrop() {
-    const ta = document.getElementById('context-input');
-    ta.addEventListener('dragover', e => {
-      e.preventDefault();
-      ta.classList.add('drag-over');
+  function renderSrcChips() {
+    const bar = document.getElementById('src-chips-bar');
+    const visible = srcFiles.filter(f => f.role !== 'ignore');
+    bar.style.display = visible.length ? '' : 'none';
+    bar.innerHTML = '';
+    visible.forEach(entry => {
+      const idx = srcFiles.indexOf(entry);
+      const [icon, label] = SRC_ROLE_META[entry.role] || ['📄', ''];
+      const chip = document.createElement('div');
+      chip.className = `src-chip role-${entry.role}${entry.loading ? ' loading' : ''}`;
+      chip.innerHTML =
+        `<span>${icon}</span>` +
+        `<span class="chip-name" title="${entry.file.name}">${entry.file.name}</span>` +
+        `<span class="chip-role">${label}</span>` +
+        (entry.loading ? '<span style="font-size:11px">…</span>'
+          : `<button class="chip-rm" onclick="removeSrcFile(${idx})">×</button>`);
+      bar.appendChild(chip);
     });
-    ta.addEventListener('dragleave', () => ta.classList.remove('drag-over'));
-    ta.addEventListener('drop', e => {
+  }
+
+  function removeSrcFile(idx) {
+    srcFiles.splice(idx, 1);
+    renderSrcChips();
+    updateSrcInputsFromFiles();
+  }
+
+  function updateSrcInputsFromFiles() {
+    const textFiles  = srcFiles.filter(f => f.role === 'src_text'    && !f.loading && f.text);
+    const instrFiles = srcFiles.filter(f => f.role === 'instruction'  && !f.loading && f.text);
+    const graphFiles = srcFiles.filter(f => f.role === 'src_graphic'  && !f.loading);
+
+    if (textFiles.length) {
+      const combined = textFiles.length === 1
+        ? textFiles[0].text
+        : textFiles.map(f => `─── ${f.file.name} ───\n\n${f.text}`).join('\n\n');
+      document.getElementById('source-text').value = combined;
+      document.getElementById('char-count').textContent = combined.length.toLocaleString();
+    }
+
+    if (instrFiles.length || graphFiles.length) {
+      let ctx = '';
+      if (graphFiles.length)
+        ctx += '📎 첨부 그래픽: ' + graphFiles.map(f => f.file.name).join(', ') + '\n\n';
+      if (instrFiles.length)
+        ctx += instrFiles.map(f => f.text).join('\n\n');
+      document.getElementById('context-input').value = ctx.trim();
+    }
+  }
+
+  async function processSrcFile(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (SRC_SKIP_EXTS.has(ext)) return;
+    if (srcFiles.find(f => f.file.name === file.name && f.file.size === file.size)) return;
+    const entry = { file, role: 'ignore', text: '', loading: true };
+    srcFiles.push(entry);
+    renderSrcChips();
+    try {
+      let text;
+      if (['txt','md'].includes(ext)) {
+        text = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = e => res(e.target.result); r.onerror = rej;
+          r.readAsText(file, 'utf-8');
+        });
+      } else {
+        text = await extractTextViaServer(file);
+      }
+      entry.text  = text;
+      entry.role  = guessTranslateRole(file, text);
+    } catch (e) {
+      entry.role = 'ignore'; entry.text = '';
+    } finally {
+      entry.loading = false;
+      renderSrcChips();
+      updateSrcInputsFromFiles();
+    }
+  }
+
+  async function handleSrcFiles(fileList) {
+    for (const file of fileList) await processSrcFile(file);
+  }
+
+  async function handleSrcDrop(dataTransfer) {
+    const items = [...(dataTransfer.items || [])];
+    if (items.length && items[0].webkitGetAsEntry) {
+      const entries = items.map(i => i.webkitGetAsEntry()).filter(Boolean);
+      const files = (await Promise.all(entries.map(e => collectFilesFromEntry(e)))).flat();
+      for (const file of files) await processSrcFile(file);
+    } else {
+      await handleSrcFiles(dataTransfer.files);
+    }
+  }
+
+  (function setupSrcDrop() {
+    const panel   = document.getElementById('source-panel');
+    const overlay = document.getElementById('src-drop-overlay');
+
+    panel.addEventListener('dragover', e => {
       e.preventDefault();
-      ta.classList.remove('drag-over');
-      const file = e.dataTransfer.files[0];
-      if (file) handleContextFile(file);
+      overlay.classList.add('visible');
+    });
+    panel.addEventListener('dragleave', e => {
+      if (!panel.contains(e.relatedTarget)) overlay.classList.remove('visible');
+    });
+    panel.addEventListener('drop', e => {
+      e.preventDefault();
+      overlay.classList.remove('visible');
+      handleSrcDrop(e.dataTransfer);
+    });
+    document.getElementById('src-file-input').addEventListener('change', function() {
+      handleSrcFiles(this.files); this.value = '';
+    });
+    document.getElementById('src-folder-input').addEventListener('change', function() {
+      handleSrcFiles(this.files); this.value = '';
     });
   })();
 
