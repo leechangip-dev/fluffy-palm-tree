@@ -276,6 +276,7 @@ def api_patent_verify():
     data = request.get_json(force=True)
     source_text: str = data.get("source_text", "").strip()
     translation_text: str = data.get("translation_text", "").strip()
+    instruction_text: str = data.get("instruction_text", "").strip()
     notes_text: str = data.get("notes_text", "").strip()
     drawing_text: str = data.get("drawing_text", "").strip()
     ser_data: str = data.get("ser_data", "").strip()
@@ -290,16 +291,20 @@ def api_patent_verify():
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 500
 
+    instruction_block = f"\n\n[번역지시서]\n{instruction_text[:3000]}" if instruction_text else ""
     notes_block   = f"\n\n[번역자 메모]\n{notes_text[:2000]}"   if notes_text   else ""
     drawing_block = f"\n\n[도면 PDF 텍스트]\n{drawing_text[:2000]}" if drawing_text else ""
     ser_block     = f"\n\n[SER 데이터]\n{ser_data[:2000]}"      if ser_data     else ""
+    instruction_instr = """
+0. Translation instructions (번역지시서): strictly apply all terminology rules, style
+   requirements, and client-specific conventions specified in the 번역지시서.""" if instruction_text else ""
     drawing_instr = """
 8. Drawing callout check: verify that reference numerals in the JP spec match the EN translation
    and the drawing PDF. Report mismatches in "drawing_mismatches".""" if drawing_text else ""
 
     prompt = f"""You are a senior patent translation verifier (Japanese→English PCT).
 
-Verify sentence-by-sentence, checking:
+Verify sentence-by-sentence, checking:{instruction_instr}
 1. Strict literal fidelity — no fluency smoothing
 2. Patent terminology accuracy and consistency
 3. Claims conventions: a/an/the articles, "comprising"/"wherein"/"configured to"
@@ -357,7 +362,7 @@ Omit sentences/paragraphs with no issues.
 {source_text[:6000]}
 
 [訳文 (English)]
-{translation_text[:6000]}{notes_block}{drawing_block}{ser_block}"""
+{translation_text[:6000]}{instruction_block}{notes_block}{drawing_block}{ser_block}"""
 
     raw = translator._call_api(
         system=[{

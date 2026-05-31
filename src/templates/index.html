@@ -1165,12 +1165,13 @@
   const PATENT_ROLES = [
     ['source',      '🇯🇵 원문 (JP)'],
     ['translation', '🇺🇸 번역문 (EN)'],
+    ['instruction', '📋 번역지시서'],
     ['notes',       '📝 번역자 메모'],
     ['drawing',     '🖼️ 도면 (PDF)'],
     ['ser',         '📊 SER (xlsx)'],
     ['ignore',      '— 제외'],
   ];
-  const ROLE_ICONS = { source:'🇯🇵', translation:'🇺🇸', notes:'📝', drawing:'🖼️', ser:'📊', ignore:'📄' };
+  const ROLE_ICONS = { source:'🇯🇵', translation:'🇺🇸', instruction:'📋', notes:'📝', drawing:'🖼️', ser:'📊', ignore:'📄' };
 
   function hasJapanese(text) { return /[぀-ヿ一-鿿]/.test(text.slice(0, 800)); }
   function hasEnglish(text) { return /[a-zA-Z]{4,}/.test(text.slice(0, 800)) && !hasJapanese(text); }
@@ -1188,6 +1189,7 @@
     // Filename keyword patterns (checked before content for speed)
     if (/\b(jp|jpn|japan|原文|原稿|和文|source)\b/.test(n)) return 'source';
     if (/\b(en|eng|english|翻訳文|translation)\b/.test(n)) return 'translation';
+    if (/指示|指示書|지시|지시서|instruction|brief|guideline|style.?guide|翻訳指示/.test(n)) return 'instruction';
     if (/note|memo|メモ|コメント|메모|remark/.test(n)) return 'notes';
     if (/\bser\b|selfreview|self.?review|error.?list/.test(n)) return 'ser';
     if (/draw|fig\d|図面|도면|figure/.test(n)) return 'drawing';
@@ -1356,6 +1358,7 @@
     if (patentFiles.some(f => f.loading)) { showPatentError('파일 추출이 완료될 때까지 기다려 주세요.'); return; }
     const src  = patentFiles.find(f => f.role === 'source');
     const trl  = patentFiles.find(f => f.role === 'translation');
+    const instr = patentFiles.filter(f => f.role === 'instruction').map(f => f.text).join('\n\n');
     const note = patentFiles.find(f => f.role === 'notes');
     const drw  = patentFiles.find(f => f.role === 'drawing');
     const ser  = patentFiles.find(f => f.role === 'ser');
@@ -1376,6 +1379,7 @@
         body: JSON.stringify({
           source_text: src.text,
           translation_text: trl.text,
+          instruction_text: instr,
           notes_text: note ? note.text : '',
           drawing_text: drw ? drw.text : '',
           ser_data: ser ? ser.text : '',
