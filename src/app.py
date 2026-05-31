@@ -570,6 +570,144 @@ def _make_docx_report(issues, source_errors, drawing_mismatches, ser_verificatio
         as_attachment=True, download_name="번역검증보고서.docx")
 
 
+@app.route("/api/patent-corrected-docx", methods=["POST"])
+def api_patent_corrected_docx():
+    """Return a corrected translation DOCX with OOXML track changes for 심각 issues."""
+    data = request.get_json(force=True)
+    translation_text: str = data.get("translation_text", "")
+    issues: list = data.get("issues", [])
+    corrections = [
+        i for i in issues
+        if i.get("severity") == "심각" and i.get("corrected_en", "").strip()
+    ]
+    return _make_corrected_translation_docx(translation_text, corrections)
+
+
+def _make_corrected_translation_docx(translation_text: str, corrections: list[dict]):
+    import difflib
+    import datetime
+    import docx
+    from docx.shared import RGBColor, Pt
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    now = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    AUTHOR = "특허검증시스템"
+    _rid = [1]
+
+    def _next():
+        v = _rid[0]; _rid[0] += 2; return v, v + 1
+
+    def _sp(el):
+        el.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
+
+    def _run(text):
+        r = OxmlElement("w:r")
+        t = OxmlElement("w:t"); _sp(t); t.text = text; r.append(t); return r
+
+    def _del_run(text):
+        r = OxmlElement("w:r")
+        t = OxmlElement("w:delText"); _sp(t); t.text = text; r.append(t); return r
+
+    def _apply_track(para, before, old_text, new_text, after):
+        p_el = para._p
+        pPr = p_el.find(qn("w:pPr"))
+        p_el.clear()
+        if pPr is not None:
+            p_el.append(pPr)
+        did, iid = _next()
+        if before:
+            p_el.append(_run(before))
+        del_el = OxmlElement("w:del")
+        del_el.set(qn("w:id"), str(did))
+        del_el.set(qn("w:author"), AUTHOR)
+        del_el.set(qn("w:date"), now)
+        del_el.append(_del_run(old_text))
+        p_el.append(del_el)
+        ins_el = OxmlElement("w:ins")
+        ins_el.set(qn("w:id"), str(iid))
+        ins_el.set(qn("w:author"), AUTHOR)
+        ins_el.set(qn("w:date"), now)
+        ins_el.append(_run(new_text))
+        p_el.append(ins_el)
+        if after:
+            p_el.append(_run(after))
+
+    paragraphs = [p.strip() for p in translation_text.split("\n") if p.strip()]
+
+    # Match each correction to its best paragraph
+    correction_map: dict[int, dict] = {}
+    used_ids: set[int] = set()
+    for corr in corrections:
+        existing = corr.get("existing_en", "").strip()
+        if not existing:
+            continue
+        probe = existing.lower()[:200]
+        best_idx, best_ratio = -1, 0.0
+        for i, para in enumerate(paragraphs):
+            if i in correction_map:
+                continue
+            ratio = difflib.SequenceMatcher(None, probe, para.lower()[:200]).ratio()
+            if ratio > best_ratio:
+                best_ratio, best_idx = ratio, i
+        if best_ratio >= 0.4 and best_idx >= 0:
+            correction_map[best_idx] = corr
+            used_ids.add(id(corr))
+
+    doc = docx.Document()
+    doc.styles["Normal"].font.size = Pt(10.5)
+
+    doc.add_heading("수정본 번역문 / Corrected Translation", 0)
+    matched = len(correction_map)
+    note = doc.add_paragraph(
+        f"심각(Critical) 지적사항 {len(corrections)}건 중 {matched}건 자동 반영.\n"
+        "🔴 취소선: 기존 번역  |  🔵 밑줄: 수정 번역\n"
+        "Word의 [검토] → [변경 내용 표시]에서 수정이력을 확인·승인할 수 있습니다."
+    )
+    note.runs[0].italic = True
+    doc.add_paragraph()
+
+    for i, para_text in enumerate(paragraphs):
+        p = doc.add_paragraph()
+        corr = correction_map.get(i)
+        if corr:
+            existing = corr.get("existing_en", "").strip()
+            corrected = corr.get("corrected_en", "").strip()
+            probe = existing.lower()[:80]
+            pos = para_text.lower().find(probe)
+            if pos >= 0:
+                end = min(pos + len(existing), len(para_text))
+                _apply_track(p, para_text[:pos], para_text[pos:end], corrected, para_text[end:])
+            else:
+                _apply_track(p, "", para_text, corrected, "")
+        else:
+            p.add_run(para_text)
+
+    # Unmatched corrections appendix
+    unmatched = [c for c in corrections if id(c) not in used_ids]
+    if unmatched:
+        doc.add_paragraph()
+        doc.add_heading(f"자동 매칭 불가 ({len(unmatched)}건) — 수동 적용 필요", 1)
+        doc.add_paragraph("아래 수정사항은 본문에서 위치를 자동으로 찾지 못했습니다.")
+        for c in unmatched:
+            p1 = doc.add_paragraph(style="List Bullet")
+            p1.add_run("기존: ").bold = True
+            p1.add_run(c.get("existing_en", ""))
+            p2 = doc.add_paragraph(style="List Bullet")
+            p2.add_run("수정: ").bold = True
+            r = p2.add_run(c.get("corrected_en", ""))
+            r.font.color.rgb = RGBColor(0x00, 0x00, 0xCC)
+            r.bold = True
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return send_file(buf,
+        mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        as_attachment=True,
+        download_name="수정본_번역문.docx")
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, host="0.0.0.0", port=port)
