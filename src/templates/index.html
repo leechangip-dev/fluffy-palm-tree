@@ -683,17 +683,24 @@
     <div id="patent-mode">
 
       <!-- Drop zone -->
-      <div class="patent-dropzone" id="patent-dropzone"
-           onclick="document.getElementById('patent-file-input').click()">
+      <div class="patent-dropzone" id="patent-dropzone">
         <div class="drop-icon">📂</div>
-        <div class="drop-title">파일을 드래그&드롭 또는 클릭하여 선택</div>
+        <div class="drop-title">파일 또는 폴더를 드래그&드롭</div>
         <div class="drop-hint">
-          🇯🇵 일본어 원문 · 🇺🇸 영어 번역문 · 📝 번역자 메모 · 🖼 도면(PDF) · 📊 SER(xlsx)<br>
-          <small>지원 형식: .docx &nbsp;.txt &nbsp;.md &nbsp;.pdf &nbsp;.xlsx &nbsp;.pptx</small>
+          🇯🇵 일본어 원문 · 🇺🇸 영어 번역문 · 📝 번역자 메모 · 🖼 도면(PDF/PPTX) · 📊 SER(xlsx)<br>
+          <small>지원 형식: .docx &nbsp;.txt &nbsp;.md &nbsp;.pdf &nbsp;.xlsx &nbsp;.pptx &nbsp;📁 폴더</small>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;justify-content:center">
+          <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 12px"
+                  onclick="document.getElementById('patent-file-input').click()">📄 파일 선택</button>
+          <button type="button" class="btn-secondary" style="font-size:12px;padding:4px 12px"
+                  onclick="document.getElementById('patent-folder-input').click()">📁 폴더 선택</button>
         </div>
       </div>
       <input type="file" id="patent-file-input" multiple
              accept=".txt,.md,.docx,.pdf,.xlsx,.pptx"
+             style="display:none" onchange="handlePatentFiles(this.files)">
+      <input type="file" id="patent-folder-input" multiple webkitdirectory
              style="display:none" onchange="handlePatentFiles(this.files)">
 
       <!-- File list -->
@@ -1165,20 +1172,32 @@
   ];
   const ROLE_ICONS = { source:'🇯🇵', translation:'🇺🇸', notes:'📝', drawing:'🖼️', ser:'📊', ignore:'📄' };
 
-  function hasJapanese(text) { return /[぀-ヿ一-鿿]/.test(text.slice(0, 600)); }
+  function hasJapanese(text) { return /[぀-ヿ一-鿿]/.test(text.slice(0, 800)); }
+  function hasEnglish(text) { return /[a-zA-Z]{4,}/.test(text.slice(0, 800)) && !hasJapanese(text); }
+
+  const SKIP_EXTENSIONS = new Set(['exe','dll','zip','tar','gz','7z','jpg','jpeg','png','gif','bmp','tiff','mp3','mp4','mov','avi','sys','ds_store','ini','lnk']);
 
   function guessRole(file, text) {
     const n = file.name.toLowerCase();
     const ext = n.split('.').pop();
-    if (ext === 'pdf') return 'drawing';
-    if (ext === 'xlsx') return 'ser';
-    if (/\bjp\b|japan|原文|原稿|和文/.test(n)) return 'source';
-    if (/\ben\b|english|翻訳|translation|en-us/.test(n)) return 'translation';
-    if (/note|memo|メモ|コメント|메모/.test(n)) return 'notes';
-    if (/ser|error/.test(n)) return 'ser';
-    if (/draw|fig|図|도면/.test(n)) return 'drawing';
-    if (hasJapanese(text)) return 'source';
-    if (/[a-zA-Z]/.test(text.slice(0, 300)) && !hasJapanese(text)) return 'translation';
+    // Skip irrelevant file types
+    if (SKIP_EXTENSIONS.has(ext)) return 'ignore';
+    // Extension-based strong signals
+    if (ext === 'xlsx' || ext === 'xls') return 'ser';
+    if (ext === 'pptx' || ext === 'ppt') return 'drawing';
+    // Filename keyword patterns (checked before content for speed)
+    if (/\b(jp|jpn|japan|原文|原稿|和文|source)\b/.test(n)) return 'source';
+    if (/\b(en|eng|english|翻訳文|translation)\b/.test(n)) return 'translation';
+    if (/note|memo|メモ|コメント|메모|remark/.test(n)) return 'notes';
+    if (/\bser\b|selfreview|self.?review|error.?list/.test(n)) return 'ser';
+    if (/draw|fig\d|図面|도면|figure/.test(n)) return 'drawing';
+    if (ext === 'pdf') {
+      // PDF: drawing unless content is heavily text (>300 chars without images)
+      return text && text.trim().length > 400 ? 'source' : 'drawing';
+    }
+    // Content-based detection
+    if (text && hasJapanese(text)) return 'source';
+    if (text && hasEnglish(text)) return 'translation';
     return 'ignore';
   }
 
@@ -1191,32 +1210,73 @@
     return data.text;
   }
 
+  // Recursively collect File objects from a DataTransferEntry (file or directory)
+  async function collectFilesFromEntry(entry) {
+    if (entry.isFile) {
+      return new Promise(res => entry.file(f => res([f]), () => res([])));
+    }
+    if (entry.isDirectory) {
+      const reader = entry.createReader();
+      const allEntries = await new Promise(res => {
+        const acc = [];
+        function readBatch() {
+          reader.readEntries(batch => {
+            if (!batch.length) { res(acc); return; }
+            acc.push(...batch);
+            readBatch();
+          }, () => res(acc));
+        }
+        readBatch();
+      });
+      const nested = await Promise.all(allEntries.map(e => collectFilesFromEntry(e)));
+      return nested.flat();
+    }
+    return [];
+  }
+
+  async function processOneFile(file) {
+    if (patentFiles.find(f => f.file.name === file.name && f.file.size === file.size)) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (SKIP_EXTENSIONS.has(ext)) return;
+    const entry = { file, role: 'ignore', text: '', loading: true };
+    patentFiles.push(entry);
+    renderPatentFileList();
+    try {
+      let text;
+      if (['txt', 'md'].includes(ext)) {
+        text = await new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = e => res(e.target.result); r.onerror = rej;
+          r.readAsText(file, 'utf-8');
+        });
+      } else {
+        text = await extractTextViaServer(file);
+      }
+      entry.text = text;
+      entry.role = guessRole(file, text);
+    } catch (e) {
+      entry.role = 'ignore'; entry.text = '';
+    } finally {
+      entry.loading = false;
+      renderPatentFileList();
+    }
+  }
+
   async function handlePatentFiles(fileList) {
     for (const file of fileList) {
-      if (patentFiles.find(f => f.file.name === file.name)) continue;
-      const entry = { file, role: 'ignore', text: '', loading: true };
-      patentFiles.push(entry);
-      renderPatentFileList();
-      try {
-        const ext = file.name.split('.').pop().toLowerCase();
-        let text;
-        if (['txt', 'md'].includes(ext)) {
-          text = await new Promise((res, rej) => {
-            const r = new FileReader();
-            r.onload = e => res(e.target.result); r.onerror = rej;
-            r.readAsText(file, 'utf-8');
-          });
-        } else {
-          text = await extractTextViaServer(file);
-        }
-        entry.text = text;
-        entry.role = guessRole(file, text);
-      } catch (e) {
-        entry.role = 'ignore'; entry.text = '';
-      } finally {
-        entry.loading = false;
-        renderPatentFileList();
-      }
+      await processOneFile(file);
+    }
+  }
+
+  async function handlePatentDrop(dataTransfer) {
+    const items = [...(dataTransfer.items || [])];
+    if (items.length && items[0].webkitGetAsEntry) {
+      // Use Entry API to support folders
+      const entries = items.map(i => i.webkitGetAsEntry()).filter(Boolean);
+      const files = (await Promise.all(entries.map(e => collectFilesFromEntry(e)))).flat();
+      for (const file of files) await processOneFile(file);
+    } else {
+      await handlePatentFiles(dataTransfer.files);
     }
   }
 
@@ -1261,14 +1321,16 @@
     });
   }
 
-  // Drag & drop for the patent dropzone
+  // Drag & drop for the patent dropzone (supports folders via Entry API)
   (function setupPatentDrop() {
     const zone = document.getElementById('patent-dropzone');
     zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
-    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('dragleave', e => {
+      if (!zone.contains(e.relatedTarget)) zone.classList.remove('drag-over');
+    });
     zone.addEventListener('drop', e => {
       e.preventDefault(); zone.classList.remove('drag-over');
-      handlePatentFiles(e.dataTransfer.files);
+      handlePatentDrop(e.dataTransfer);
     });
   })();
 
