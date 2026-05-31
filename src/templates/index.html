@@ -675,10 +675,29 @@
         </div>
       </div>
 
+      <!-- Translate batch status -->
+      <div class="batch-status-panel" id="batch-translate-panel">
+        <div class="batch-title">🔄 배치 번역 작업</div>
+        <div class="batch-id-text" id="batch-translate-id"></div>
+        <div class="batch-status-info" id="batch-translate-info"></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-secondary" style="font-size:12px;padding:5px 14px"
+                  id="batch-translate-check-btn" onclick="checkTranslateBatch()">🔍 상태 확인</button>
+          <span class="spinner" id="batch-translate-spinner"></span>
+          <button class="btn-secondary" style="font-size:12px;padding:5px 10px;color:#9aa0a6;border-color:#dadce0"
+                  onclick="dismissBatchTranslatePanel()" title="닫기">✕</button>
+        </div>
+      </div>
+
       <!-- Action bar -->
       <div class="action-bar">
         <button class="btn-primary" id="translate-btn" onclick="doTranslate()">번역하기</button>
         <button class="btn-secondary" id="validate-after-btn" disabled onclick="doValidateAfter()">검증하기</button>
+        <button class="btn-secondary" id="batch-translate-btn" onclick="doTranslateBatch()"
+                style="border-color:#34a853;color:#34a853"
+                title="비동기 처리 — API 비용 50% 절감. 결과는 수분~1시간 내 확인 가능합니다.">
+          💰 배치 번역 (50% 절감)
+        </button>
         <button class="btn-secondary" id="drawing-translate-btn" style="display:none"
                 onclick="doTranslateDrawing()">📐 도면 번역</button>
         <button class="btn-stop" id="stop-btn" onclick="doStop()">■ 중지</button>
@@ -731,9 +750,28 @@
       </div>
       <div class="val-pairs" id="val-pairs"></div>
 
+      <!-- Validate batch status -->
+      <div class="batch-status-panel" id="batch-validate-panel">
+        <div class="batch-title">🔄 배치 검증 작업</div>
+        <div class="batch-id-text" id="batch-validate-id"></div>
+        <div class="batch-status-info" id="batch-validate-info"></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-secondary" style="font-size:12px;padding:5px 14px"
+                  id="batch-validate-check-btn" onclick="checkValidateBatch()">🔍 상태 확인</button>
+          <span class="spinner" id="batch-validate-spinner"></span>
+          <button class="btn-secondary" style="font-size:12px;padding:5px 10px;color:#9aa0a6;border-color:#dadce0"
+                  onclick="dismissBatchValidatePanel()" title="닫기">✕</button>
+        </div>
+      </div>
+
       <!-- Action bar -->
       <div class="val-action-bar">
         <button class="btn-primary" id="val-validate-btn" onclick="doValidateOnly()">검증하기</button>
+        <button class="btn-secondary" id="batch-validate-btn" onclick="doValidateBatch()"
+                style="border-color:#34a853;color:#34a853"
+                title="비동기 처리 — API 비용 50% 절감. 품질 점수 자동 포함.">
+          💰 배치 검증 (50% 절감)
+        </button>
         <button class="btn-stop" id="val-stop-btn" onclick="doValStop()">■ 중지</button>
         <span class="spinner" id="val-spinner"></span>
         <label class="quality-check-label" title="API 크레딧을 사용합니다">
@@ -1926,6 +1964,218 @@
   })();
 
   // ══════════════════════════════════════════════════
+  // BATCH API — TRANSLATE
+  // ══════════════════════════════════════════════════
+
+  let currentBatchIdTranslate = null;
+  let batchPollTimerTranslate = null;
+
+  function dismissBatchTranslatePanel() {
+    if (batchPollTimerTranslate) { clearInterval(batchPollTimerTranslate); batchPollTimerTranslate = null; }
+    document.getElementById('batch-translate-panel').classList.remove('visible');
+    localStorage.removeItem('batchId_translate');
+    localStorage.removeItem('batchMeta_translate');
+    currentBatchIdTranslate = null;
+  }
+
+  function _showTranslateBatchPanel(batchId, msg, isError) {
+    document.getElementById('batch-translate-id').textContent = 'Batch ID: ' + batchId;
+    document.getElementById('batch-translate-info').textContent = msg;
+    const panel = document.getElementById('batch-translate-panel');
+    panel.className = 'batch-status-panel' + (isError ? ' error' : '');
+    panel.classList.add('visible');
+  }
+
+  async function doTranslateBatch() {
+    const text = document.getElementById('source-text').value.trim();
+    if (!text) return;
+    const sourceLang  = document.getElementById('source-lang-select').value || null;
+    const context     = document.getElementById('context-input').value.trim() || null;
+    const targetLangs = [...selectedTargets];
+
+    const btn = document.getElementById('batch-translate-btn');
+    btn.disabled = true; btn.textContent = '제출 중...';
+    document.getElementById('batch-translate-panel').classList.remove('visible');
+    hideError();
+
+    try {
+      const resp = await fetch('/api/translate-batch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, target_langs: targetLangs, source_lang: sourceLang, context }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || data.error) { showError(data.error || '배치 제출 실패'); return; }
+
+      currentBatchIdTranslate = data.batch_id;
+      _showTranslateBatchPanel(data.batch_id, '⏳ 배치 번역 제출 완료. 수분~1시간 내 처리됩니다.', false);
+      localStorage.setItem('batchId_translate', data.batch_id);
+      localStorage.setItem('batchMeta_translate', JSON.stringify({ targetLangs }));
+      startTranslateBatchPolling();
+    } catch (e) {
+      showError('배치 제출 오류: ' + e.message);
+    } finally {
+      btn.disabled = false; btn.textContent = '💰 배치 번역 (50% 절감)';
+    }
+  }
+
+  function startTranslateBatchPolling() {
+    if (batchPollTimerTranslate) clearInterval(batchPollTimerTranslate);
+    batchPollTimerTranslate = setInterval(checkTranslateBatch, 15000);
+  }
+
+  async function checkTranslateBatch() {
+    if (!currentBatchIdTranslate) return;
+    const checkBtn = document.getElementById('batch-translate-check-btn');
+    const spinner  = document.getElementById('batch-translate-spinner');
+    checkBtn.disabled = true; spinner.classList.add('visible');
+
+    try {
+      const resp = await fetch('/api/translate-batch-status/' + encodeURIComponent(currentBatchIdTranslate));
+      const data = await resp.json();
+
+      if (!resp.ok || data.error) {
+        _showTranslateBatchPanel(currentBatchIdTranslate, '❌ ' + (data.error || '오류'), true);
+        if (batchPollTimerTranslate) { clearInterval(batchPollTimerTranslate); batchPollTimerTranslate = null; }
+        return;
+      }
+      if (data.status !== 'ended') {
+        const c = data.request_counts || {};
+        const total = (c.succeeded || 0) + (c.processing || 0) + (c.errored || 0);
+        _showTranslateBatchPanel(currentBatchIdTranslate,
+          `⏳ 처리 중... (${c.succeeded || 0}/${total}개 완료)`, false);
+        return;
+      }
+
+      // Done
+      if (batchPollTimerTranslate) { clearInterval(batchPollTimerTranslate); batchPollTimerTranslate = null; }
+      localStorage.removeItem('batchId_translate');
+      localStorage.removeItem('batchMeta_translate');
+
+      const errCount = Object.keys(data.errors || {}).length;
+      const msg = errCount
+        ? `✅ 번역 완료 (일부 오류: ${errCount}건)! 결과가 표시됩니다.`
+        : '✅ 번역 완료! 결과가 표시됩니다.';
+      _showTranslateBatchPanel(currentBatchIdTranslate, msg, false);
+
+      lastResults = data.results || {};
+      const errEntries = Object.entries(data.errors || {});
+      if (errEntries.length) showError('일부 실패: ' + errEntries.map(([l, e]) => `${l}: ${e}`).join('; '));
+      if (!lastResults[activeTab]) activeTab = Object.keys(lastResults)[0] || [...selectedTargets][0];
+      renderResultTabs();
+      showResult(activeTab);
+      if (Object.keys(lastResults).length > 0) document.getElementById('validate-after-btn').disabled = false;
+
+    } catch (e) {
+      _showTranslateBatchPanel(currentBatchIdTranslate, '❌ 오류: ' + e.message, true);
+    } finally {
+      checkBtn.disabled = false; spinner.classList.remove('visible');
+    }
+  }
+
+  // ══════════════════════════════════════════════════
+  // BATCH API — VALIDATE
+  // ══════════════════════════════════════════════════
+
+  let currentBatchIdValidate = null;
+  let batchPollTimerValidate = null;
+
+  function dismissBatchValidatePanel() {
+    if (batchPollTimerValidate) { clearInterval(batchPollTimerValidate); batchPollTimerValidate = null; }
+    document.getElementById('batch-validate-panel').classList.remove('visible');
+    localStorage.removeItem('batchId_validate');
+    currentBatchIdValidate = null;
+  }
+
+  function _showValidateBatchPanel(batchId, msg, isError) {
+    document.getElementById('batch-validate-id').textContent = 'Batch ID: ' + batchId;
+    document.getElementById('batch-validate-info').textContent = msg;
+    const panel = document.getElementById('batch-validate-panel');
+    panel.className = 'batch-status-panel' + (isError ? ' error' : '');
+    panel.classList.add('visible');
+  }
+
+  async function doValidateBatch() {
+    const sourceText = document.getElementById('val-source-text').value.trim();
+    if (!sourceText) { showValError('원문을 입력하세요.'); return; }
+
+    const pairs = document.querySelectorAll('#val-pairs .val-pair');
+    const translatedTexts = {};
+    let hasText = false;
+    pairs.forEach(pair => {
+      const lang = pair.querySelector('[data-role="lang"]').value;
+      const text = pair.querySelector('[data-role="text"]').value.trim();
+      if (text) { translatedTexts[lang] = text; hasText = true; }
+    });
+    if (!hasText) { showValError('번역된 텍스트를 하나 이상 입력하세요.'); return; }
+
+    const btn = document.getElementById('batch-validate-btn');
+    btn.disabled = true; btn.textContent = '제출 중...';
+    document.getElementById('batch-validate-panel').classList.remove('visible');
+    hideValError();
+
+    try {
+      const resp = await fetch('/api/validate-batch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source_text: sourceText, translated_texts: translatedTexts }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || data.error) { showValError(data.error || '배치 제출 실패'); return; }
+
+      currentBatchIdValidate = data.batch_id;
+      _showValidateBatchPanel(data.batch_id,
+        '⏳ 배치 검증 제출 완료. 수분~1시간 내 처리됩니다. (품질 점수 자동 포함)', false);
+      localStorage.setItem('batchId_validate', data.batch_id);
+      startValidateBatchPolling();
+    } catch (e) {
+      showValError('배치 제출 오류: ' + e.message);
+    } finally {
+      btn.disabled = false; btn.textContent = '💰 배치 검증 (50% 절감)';
+    }
+  }
+
+  function startValidateBatchPolling() {
+    if (batchPollTimerValidate) clearInterval(batchPollTimerValidate);
+    batchPollTimerValidate = setInterval(checkValidateBatch, 15000);
+  }
+
+  async function checkValidateBatch() {
+    if (!currentBatchIdValidate) return;
+    const checkBtn = document.getElementById('batch-validate-check-btn');
+    const spinner  = document.getElementById('batch-validate-spinner');
+    checkBtn.disabled = true; spinner.classList.add('visible');
+
+    try {
+      const resp = await fetch('/api/validate-batch-status/' + encodeURIComponent(currentBatchIdValidate));
+      const data = await resp.json();
+
+      if (!resp.ok || data.error) {
+        _showValidateBatchPanel(currentBatchIdValidate, '❌ ' + (data.error || '오류'), true);
+        if (batchPollTimerValidate) { clearInterval(batchPollTimerValidate); batchPollTimerValidate = null; }
+        return;
+      }
+      if (data.status !== 'ended') {
+        const c = data.request_counts || {};
+        const total = (c.succeeded || 0) + (c.processing || 0) + (c.errored || 0);
+        _showValidateBatchPanel(currentBatchIdValidate,
+          `⏳ 처리 중... (${c.succeeded || 0}/${total}개 완료)`, false);
+        return;
+      }
+
+      // Done
+      if (batchPollTimerValidate) { clearInterval(batchPollTimerValidate); batchPollTimerValidate = null; }
+      localStorage.removeItem('batchId_validate');
+
+      _showValidateBatchPanel(currentBatchIdValidate, '✅ 검증 완료! 결과가 아래에 표시됩니다.', false);
+      renderValidation(data.results || {}, 'val-result-cards', 'val-validation-panel');
+
+    } catch (e) {
+      _showValidateBatchPanel(currentBatchIdValidate, '❌ 오류: ' + e.message, true);
+    } finally {
+      checkBtn.disabled = false; spinner.classList.remove('visible');
+    }
+  }
+
+  // ══════════════════════════════════════════════════
   // BATCH API (patent verify — 50% cost reduction)
   // ══════════════════════════════════════════════════
 
@@ -2078,13 +2328,26 @@
   addValPair('ja');
   addValPair('zh');
 
-  // Resume any pending batch job from a previous session
-  (function resumePendingBatch() {
-    const savedId = localStorage.getItem('lastBatchId');
-    if (!savedId) return;
-    currentBatchId = savedId;
-    _showBatchPanel(savedId, '⏳ 이전 배치 작업을 재개합니다...', false);
-    startBatchPolling();
+  // Resume any pending batch jobs from a previous session
+  (function resumePendingBatches() {
+    const tId = localStorage.getItem('batchId_translate');
+    if (tId) {
+      currentBatchIdTranslate = tId;
+      _showTranslateBatchPanel(tId, '⏳ 이전 번역 배치 작업을 재개합니다...', false);
+      startTranslateBatchPolling();
+    }
+    const vId = localStorage.getItem('batchId_validate');
+    if (vId) {
+      currentBatchIdValidate = vId;
+      _showValidateBatchPanel(vId, '⏳ 이전 검증 배치 작업을 재개합니다...', false);
+      startValidateBatchPolling();
+    }
+    const pId = localStorage.getItem('lastBatchId');
+    if (pId) {
+      currentBatchId = pId;
+      _showBatchPanel(pId, '⏳ 이전 특허 검증 배치 작업을 재개합니다...', false);
+      startBatchPolling();
+    }
   })();
 </script>
 </body>

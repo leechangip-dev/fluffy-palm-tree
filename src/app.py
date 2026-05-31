@@ -12,7 +12,7 @@ from pathlib import Path
 from flask import Flask, jsonify, render_template, request, send_file
 
 sys.path.insert(0, str(Path(__file__).parent))
-from translator import SUPPORTED_LANGUAGES, Translator, _validate_lang
+from translator import SUPPORTED_LANGUAGES, SYSTEM_PROMPT, Translator, _validate_lang
 from validator import TranslationValidator
 
 app = Flask(__name__)
@@ -844,6 +844,228 @@ def api_drawing_translation_xlsx():
     return send_file(buf,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         as_attachment=True, download_name="도면번역.xlsx")
+
+
+@app.route("/api/translate-batch", methods=["POST"])
+def api_translate_batch():
+    """Submit translation for all target languages as a Batch API job (50% cheaper)."""
+    data = request.get_json(force=True)
+    text: str = data.get("text", "").strip()
+    target_langs: list = data.get("target_langs", ["en"])
+    source_lang: str | None = data.get("source_lang") or None
+    context: str | None = data.get("context") or None
+
+    if not text:
+        return jsonify({"error": "text is required"}), 400
+
+    try:
+        translator = _get_translator()
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 500
+
+    if source_lang and source_lang not in SUPPORTED_LANGUAGES:
+        source_lang = None
+
+    requests_list = []
+    for lang in target_langs:
+        try:
+            lang = _validate_lang(lang)
+        except ValueError:
+            continue
+        target_name = SUPPORTED_LANGUAGES[lang]
+        source_hint = f" from {SUPPORTED_LANGUAGES[source_lang]}" if source_lang else ""
+        context_block = f"\n\nAdditional context: {context}" if context else ""
+        user_prompt = (
+            f"Translate the following text{source_hint} to {target_name}."
+            f"{context_block}\n\nText to translate:\n{text}"
+        )
+        requests_list.append({
+            "custom_id": f"translate-{lang}",
+            "params": {
+                "model": "claude-sonnet-4-6",
+                "max_tokens": 8096,
+                "system": [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+                "messages": [{"role": "user", "content": user_prompt}],
+            },
+        })
+
+    if not requests_list:
+        return jsonify({"error": "유효한 대상 언어가 없습니다."}), 400
+
+    try:
+        batch = translator.client.messages.batches.create(requests=requests_list)
+    except Exception as e:
+        return jsonify({"error": f"배치 제출 실패: {e}"}), 500
+
+    return jsonify({"batch_id": batch.id, "status": batch.processing_status})
+
+
+@app.route("/api/translate-batch-status/<batch_id>", methods=["GET"])
+def api_translate_batch_status(batch_id):
+    """Poll translation batch. Returns {results: {lang: text}} when ended."""
+    try:
+        translator = _get_translator()
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 500
+
+    try:
+        batch = translator.client.messages.batches.retrieve(batch_id)
+    except Exception as e:
+        return jsonify({"error": f"배치 조회 실패: {e}"}), 500
+
+    if batch.processing_status != "ended":
+        counts = batch.request_counts
+        return jsonify({
+            "batch_id": batch_id,
+            "status": batch.processing_status,
+            "request_counts": {
+                "processing": getattr(counts, "processing", 0),
+                "succeeded": getattr(counts, "succeeded", 0),
+                "errored": getattr(counts, "errored", 0),
+            },
+        })
+
+    try:
+        results_iter = translator.client.messages.batches.results(batch_id)
+    except Exception as e:
+        return jsonify({"batch_id": batch_id, "status": "ended", "error": f"결과 조회 실패: {e}"}), 500
+
+    results: dict[str, str] = {}
+    errors: dict[str, str] = {}
+    for item in results_iter:
+        lang = item.custom_id.removeprefix("translate-")
+        if item.result.type == "succeeded":
+            text_out = next((b.text for b in item.result.message.content if hasattr(b, "text")), "")
+            results[lang] = text_out
+        else:
+            errors[lang] = item.result.type
+
+    return jsonify({"batch_id": batch_id, "status": "ended", "results": results, "errors": errors})
+
+
+@app.route("/api/validate-batch", methods=["POST"])
+def api_validate_batch():
+    """Submit validation for all translated texts as a Batch API job (includes quality scoring)."""
+    data = request.get_json(force=True)
+    source_text: str = data.get("source_text", "").strip()
+    translated_texts: dict = data.get("translated_texts", {})
+
+    if not source_text:
+        return jsonify({"error": "source_text is required"}), 400
+    if not translated_texts:
+        return jsonify({"error": "translated_texts is required"}), 400
+
+    try:
+        translator = _get_translator()
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 500
+
+    json_template = (
+        '{\n'
+        '  "complete": <true if all key content is present, false if anything is missing>,\n'
+        '  "issues": ["<completeness issue>", ...],\n'
+        '  "quality_score": <float 1.0-10.0>,\n'
+        '  "quality_feedback": "<2-3 sentence feedback in Korean>"\n'
+        '}'
+    )
+
+    requests_list = []
+    for lang, translated_text in translated_texts.items():
+        lang_name = SUPPORTED_LANGUAGES.get(lang, lang.upper())
+        prompt = (
+            f"Evaluate the following translation for completeness and quality.\n\n"
+            f"[Source Text]\n{source_text[:3000]}\n\n"
+            f"[Translation → {lang_name}]\n{translated_text[:3000]}\n\n"
+            f"Respond ONLY with valid JSON:\n{json_template}"
+        )
+        requests_list.append({
+            "custom_id": f"validate-{lang}",
+            "params": {
+                "model": "claude-sonnet-4-6",
+                "max_tokens": 1024,
+                "system": [{
+                    "type": "text",
+                    "text": "You are a professional translation quality evaluator. Respond only with the requested JSON.",
+                    "cache_control": {"type": "ephemeral"},
+                }],
+                "messages": [{"role": "user", "content": prompt}],
+            },
+        })
+
+    if not requests_list:
+        return jsonify({"error": "유효한 번역 텍스트가 없습니다."}), 400
+
+    try:
+        batch = translator.client.messages.batches.create(requests=requests_list)
+    except Exception as e:
+        return jsonify({"error": f"배치 제출 실패: {e}"}), 500
+
+    return jsonify({"batch_id": batch.id, "status": batch.processing_status})
+
+
+@app.route("/api/validate-batch-status/<batch_id>", methods=["GET"])
+def api_validate_batch_status(batch_id):
+    """Poll validation batch. Returns results in same format as /api/validate when ended."""
+    try:
+        translator = _get_translator()
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 500
+
+    try:
+        batch = translator.client.messages.batches.retrieve(batch_id)
+    except Exception as e:
+        return jsonify({"error": f"배치 조회 실패: {e}"}), 500
+
+    if batch.processing_status != "ended":
+        counts = batch.request_counts
+        return jsonify({
+            "batch_id": batch_id,
+            "status": batch.processing_status,
+            "request_counts": {
+                "processing": getattr(counts, "processing", 0),
+                "succeeded": getattr(counts, "succeeded", 0),
+                "errored": getattr(counts, "errored", 0),
+            },
+        })
+
+    try:
+        results_iter = translator.client.messages.batches.results(batch_id)
+    except Exception as e:
+        return jsonify({"batch_id": batch_id, "status": "ended", "error": f"결과 조회 실패: {e}"}), 500
+
+    results: dict[str, dict] = {}
+    for item in results_iter:
+        lang = item.custom_id.removeprefix("validate-")
+        if item.result.type != "succeeded":
+            results[lang] = {
+                "complete": False, "passed": False,
+                "issues": [f"배치 처리 실패: {item.result.type}"],
+                "quality_score": None, "quality_feedback": None,
+            }
+            continue
+        raw = next((b.text for b in item.result.message.content if hasattr(b, "text")), "")
+        try:
+            match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+            parsed = json.loads(match.group() if match else raw)
+            complete = bool(parsed.get("complete", True))
+            issues = parsed.get("issues", [])
+            quality_score = round(float(parsed.get("quality_score", 0)), 1)
+            quality_feedback = str(parsed.get("quality_feedback", ""))
+            results[lang] = {
+                "complete": complete,
+                "passed": complete and quality_score >= 7.0,
+                "issues": issues,
+                "quality_score": quality_score,
+                "quality_feedback": quality_feedback,
+            }
+        except Exception:
+            results[lang] = {
+                "complete": False, "passed": False,
+                "issues": [f"응답 파싱 오류: {raw[:100]}"],
+                "quality_score": None, "quality_feedback": None,
+            }
+
+    return jsonify({"batch_id": batch_id, "status": "ended", "results": results})
 
 
 @app.route("/api/patent-verify-batch", methods=["POST"])
