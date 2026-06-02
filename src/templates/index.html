@@ -587,6 +587,22 @@
     .batch-status-panel.error { border-color: #ea4335; background: #fce8e6; }
     .batch-status-panel.error .batch-title { color: #c5221f; }
 
+    /* ── Batch job queue panel ── */
+    .batch-queue-panel { margin: 8px 16px 0; border: 1px solid #dadce0; border-radius: 8px; overflow: hidden; background: #fff; }
+    .batch-queue-title { font-size: 13px; font-weight: 500; color: #1a73e8; padding: 9px 14px; border-bottom: 1px solid #f1f3f4; display: flex; align-items: center; gap: 8px; }
+    .batch-queue-count { font-size: 11px; background: #e8f0fe; color: #1a73e8; padding: 1px 8px; border-radius: 10px; }
+    .batch-job-list { max-height: 260px; overflow-y: auto; }
+    .batch-job-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; gap: 8px; border-bottom: 1px solid #f8f9fa; }
+    .batch-job-row:last-child { border-bottom: none; }
+    .job-row-left { flex: 1; min-width: 0; }
+    .job-id { font-family: monospace; font-size: 11px; color: #5f6368; }
+    .job-time { font-size: 11px; color: #bdc1c6; margin-left: 8px; }
+    .job-status { font-size: 12px; font-weight: 500; margin-top: 2px; }
+    .job-status.proc { color: #1a73e8; } .job-status.ok { color: #34a853; } .job-status.err { color: #ea4335; }
+    .job-row-actions { display: flex; gap: 5px; flex-shrink: 0; }
+    .job-action-btn { font-size: 11px; padding: 3px 8px; border: 1px solid #dadce0; border-radius: 4px; background: #fff; cursor: pointer; color: #5f6368; }
+    .job-action-btn:hover { background: #f8f9fa; }
+
     /* ── Responsive ── */
     @media (max-width: 640px) {
       .translation-area { grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
@@ -675,18 +691,10 @@
         </div>
       </div>
 
-      <!-- Translate batch status -->
-      <div class="batch-status-panel" id="batch-translate-panel">
-        <div class="batch-title">🔄 배치 번역 작업</div>
-        <div class="batch-id-text" id="batch-translate-id"></div>
-        <div class="batch-status-info" id="batch-translate-info"></div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn-secondary" style="font-size:12px;padding:5px 14px"
-                  id="batch-translate-check-btn" onclick="checkTranslateBatch()">🔍 상태 확인</button>
-          <span class="spinner" id="batch-translate-spinner"></span>
-          <button class="btn-secondary" style="font-size:12px;padding:5px 10px;color:#9aa0a6;border-color:#dadce0"
-                  onclick="dismissBatchTranslatePanel()" title="닫기">✕</button>
-        </div>
+      <!-- Translate batch queue -->
+      <div class="batch-queue-panel" id="batch-translate-queue" style="display:none">
+        <div class="batch-queue-title">📋 배치 번역 대기열 <span class="batch-queue-count" id="btrans-count"></span></div>
+        <div class="batch-job-list" id="btrans-list"></div>
       </div>
 
       <!-- Action bar -->
@@ -750,18 +758,10 @@
       </div>
       <div class="val-pairs" id="val-pairs"></div>
 
-      <!-- Validate batch status -->
-      <div class="batch-status-panel" id="batch-validate-panel">
-        <div class="batch-title">🔄 배치 검증 작업</div>
-        <div class="batch-id-text" id="batch-validate-id"></div>
-        <div class="batch-status-info" id="batch-validate-info"></div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn-secondary" style="font-size:12px;padding:5px 14px"
-                  id="batch-validate-check-btn" onclick="checkValidateBatch()">🔍 상태 확인</button>
-          <span class="spinner" id="batch-validate-spinner"></span>
-          <button class="btn-secondary" style="font-size:12px;padding:5px 10px;color:#9aa0a6;border-color:#dadce0"
-                  onclick="dismissBatchValidatePanel()" title="닫기">✕</button>
-        </div>
+      <!-- Validate batch queue -->
+      <div class="batch-queue-panel" id="batch-validate-queue" style="display:none">
+        <div class="batch-queue-title">📋 배치 검증 대기열 <span class="batch-queue-count" id="bval-count"></span></div>
+        <div class="batch-job-list" id="bval-list"></div>
       </div>
 
       <!-- Action bar -->
@@ -819,18 +819,10 @@
       <!-- Error -->
       <div class="patent-error-banner" id="patent-error-banner"></div>
 
-      <!-- Batch status -->
-      <div class="batch-status-panel" id="batch-status-panel">
-        <div class="batch-title">🔄 배치 검증 작업</div>
-        <div class="batch-id-text" id="batch-id-text"></div>
-        <div class="batch-status-info" id="batch-status-info"></div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn-secondary" style="font-size:12px;padding:5px 14px"
-                  id="batch-check-btn" onclick="checkBatchStatus()">🔍 상태 확인</button>
-          <span class="spinner" id="batch-check-spinner"></span>
-          <button class="btn-secondary" style="font-size:12px;padding:5px 10px;color:#9aa0a6;border-color:#dadce0"
-                  onclick="dismissBatchPanel()" title="패널 닫기">✕</button>
-        </div>
+      <!-- Patent batch queue -->
+      <div class="batch-queue-panel" id="batch-patent-queue" style="display:none">
+        <div class="batch-queue-title">📋 배치 검증 대기열 <span class="batch-queue-count" id="bpatent-count"></span></div>
+        <div class="batch-job-list" id="bpatent-list"></div>
       </div>
 
       <!-- Action bar -->
@@ -1964,28 +1956,172 @@
   })();
 
   // ══════════════════════════════════════════════════
-  // BATCH API — TRANSLATE
+  // BATCH JOB QUEUE (unified — all tabs)
   // ══════════════════════════════════════════════════
 
-  let currentBatchIdTranslate = null;
-  let batchPollTimerTranslate = null;
+  // Each job: { localId, batchId, type, statusEndpoint, meta, status, submittedAt, statusMsg }
+  let _batchQueue = JSON.parse(localStorage.getItem('batchQueue') || '[]');
+  let _batchPollTimer = null;
+  const _jobResults = {}; // localId → resultData (in-memory; not persisted)
 
-  function dismissBatchTranslatePanel() {
-    if (batchPollTimerTranslate) { clearInterval(batchPollTimerTranslate); batchPollTimerTranslate = null; }
-    document.getElementById('batch-translate-panel').classList.remove('visible');
-    localStorage.removeItem('batchId_translate');
-    localStorage.removeItem('batchMeta_translate');
-    currentBatchIdTranslate = null;
+  function _saveBatchQueue() {
+    localStorage.setItem('batchQueue', JSON.stringify(_batchQueue));
   }
 
-  function _showTranslateBatchPanel(batchId, msg, isError) {
-    document.getElementById('batch-translate-id').textContent = 'Batch ID: ' + batchId;
-    document.getElementById('batch-translate-info').textContent = msg;
-    const panel = document.getElementById('batch-translate-panel');
-    panel.className = 'batch-status-panel' + (isError ? ' error' : '');
-    panel.classList.add('visible');
+  function _addBatchJob(batchId, type, statusEndpoint, meta) {
+    const job = {
+      localId: Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      batchId, type, statusEndpoint, meta,
+      status: 'processing',
+      submittedAt: new Date().toISOString(),
+      statusMsg: '⏳ 처리 중...',
+    };
+    _batchQueue.unshift(job);
+    _saveBatchQueue();
+    _renderQueue(type);
+    _startBatchPoll();
   }
 
+  function _startBatchPoll() {
+    if (_batchPollTimer) return;
+    _batchPollTimer = setInterval(_pollAll, 15000);
+  }
+
+  async function _pollAll() {
+    const processing = _batchQueue.filter(j => j.status === 'processing');
+    if (processing.length === 0) {
+      clearInterval(_batchPollTimer); _batchPollTimer = null; return;
+    }
+    await Promise.all(processing.map(_pollOne));
+  }
+
+  async function _pollOne(job) {
+    try {
+      const resp = await fetch(job.statusEndpoint + encodeURIComponent(job.batchId));
+      const data = await resp.json();
+
+      if (!resp.ok || data.error) {
+        job.status = 'error';
+        job.statusMsg = '❌ ' + (data.error || '오류');
+        _saveBatchQueue(); _renderQueue(job.type);
+        return;
+      }
+
+      if (data.status !== 'ended') {
+        const c = data.request_counts || {};
+        const total = (c.succeeded || 0) + (c.processing || 0) + (c.errored || 0);
+        job.statusMsg = total > 0
+          ? `⏳ 처리 중... (${c.succeeded || 0}/${total}개 완료)`
+          : '⏳ 처리 중...';
+        _saveBatchQueue(); _renderQueue(job.type);
+        return;
+      }
+
+      job.status = 'ended';
+      const errCount = Object.keys(data.errors || {}).length;
+      job.statusMsg = errCount ? `✅ 완료 (오류 ${errCount}건)` : '✅ 완료';
+      _jobResults[job.localId] = data;
+      _saveBatchQueue();
+      _applyResult(job, data);
+      _renderQueue(job.type);
+
+    } catch (e) {
+      job.statusMsg = '❌ 오류: ' + e.message;
+      _saveBatchQueue(); _renderQueue(job.type);
+    }
+  }
+
+  function _applyResult(job, data) {
+    if (job.type === 'translate') {
+      lastResults = data.results || {};
+      const errEntries = Object.entries(data.errors || {});
+      if (errEntries.length) showError('일부 실패: ' + errEntries.map(([l, e]) => `${l}: ${e}`).join('; '));
+      if (!lastResults[activeTab]) activeTab = Object.keys(lastResults)[0] || [...selectedTargets][0];
+      renderResultTabs(); showResult(activeTab);
+      if (Object.keys(lastResults).length > 0) document.getElementById('validate-after-btn').disabled = false;
+    } else if (job.type === 'validate') {
+      renderValidation(data.results || {}, 'val-result-cards', 'val-validation-panel');
+    } else if (job.type === 'patent') {
+      const meta = job.meta || {};
+      lastPatentResult = data.result;
+      lastPatentResult._translationText = meta.translationText || '';
+      lastPatentResult._filenames = {
+        source: meta.sourceName || '', translation: meta.translationName || '',
+        notes: '', drawing_src: '', drawing_trl: '', ser: '',
+      };
+      renderPatentResults(data.result);
+      document.getElementById('patent-report-xlsx').style.display = 'inline-flex';
+      document.getElementById('patent-report-docx').style.display = 'inline-flex';
+      const hasCorrectable = (data.result.issues || []).some(
+        i => i.severity === '심각' && i.corrected_en && i.corrected_en.trim()
+      );
+      document.getElementById('patent-corrected-docx').style.display = hasCorrectable ? 'inline-flex' : 'none';
+    }
+  }
+
+  function _relTime(iso) {
+    const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+    if (m < 1) return '방금';
+    if (m < 60) return `${m}분 전`;
+    return `${Math.floor(m / 60)}시간 ${m % 60}분 전`;
+  }
+
+  function _renderQueue(type) {
+    const cfg = {
+      translate: { panel: 'batch-translate-queue', list: 'btrans-list',  count: 'btrans-count'  },
+      validate:  { panel: 'batch-validate-queue',  list: 'bval-list',    count: 'bval-count'    },
+      patent:    { panel: 'batch-patent-queue',    list: 'bpatent-list', count: 'bpatent-count' },
+    }[type];
+
+    const jobs   = _batchQueue.filter(j => j.type === type);
+    const panel  = document.getElementById(cfg.panel);
+    const listEl = document.getElementById(cfg.list);
+    const cntEl  = document.getElementById(cfg.count);
+    if (!panel || !listEl) return;
+
+    if (jobs.length === 0) { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+
+    const proc = jobs.filter(j => j.status === 'processing').length;
+    cntEl.textContent = proc > 0 ? `${proc}개 처리 중` : `${jobs.length}개`;
+
+    listEl.innerHTML = jobs.map(job => {
+      const shortId = job.batchId.length > 18 ? job.batchId.slice(0, 18) + '…' : job.batchId;
+      const sc = job.status === 'processing' ? 'proc' : job.status === 'ended' ? 'ok' : 'err';
+      const hasRes = !!_jobResults[job.localId];
+      return `<div class="batch-job-row">
+        <div class="job-row-left">
+          <span class="job-id">${shortId}</span>
+          <span class="job-time">${_relTime(job.submittedAt)}</span>
+          <div class="job-status ${sc}">${job.statusMsg}</div>
+        </div>
+        <div class="job-row-actions">
+          ${job.status === 'processing' ? `<button class="job-action-btn" onclick="_manualPollJob('${job.localId}')">🔍 확인</button>` : ''}
+          ${hasRes ? `<button class="job-action-btn" onclick="_viewResult('${job.localId}')">📋 결과</button>` : ''}
+          <button class="job-action-btn" onclick="_removeJob('${job.localId}')" title="제거">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  async function _manualPollJob(localId) {
+    const job = _batchQueue.find(j => j.localId === localId);
+    if (job && job.status === 'processing') await _pollOne(job);
+  }
+
+  function _viewResult(localId) {
+    const job = _batchQueue.find(j => j.localId === localId);
+    if (job && _jobResults[localId]) _applyResult(job, _jobResults[localId]);
+  }
+
+  function _removeJob(localId) {
+    _batchQueue = _batchQueue.filter(j => j.localId !== localId);
+    delete _jobResults[localId];
+    _saveBatchQueue();
+    ['translate', 'validate', 'patent'].forEach(_renderQueue);
+  }
+
+  // ── Translate batch submit ──
   async function doTranslateBatch() {
     const text = document.getElementById('source-text').value.trim();
     if (!text) return;
@@ -1995,7 +2131,6 @@
 
     const btn = document.getElementById('batch-translate-btn');
     btn.disabled = true; btn.textContent = '제출 중...';
-    document.getElementById('batch-translate-panel').classList.remove('visible');
     hideError();
 
     try {
@@ -2005,12 +2140,7 @@
       });
       const data = await resp.json();
       if (!resp.ok || data.error) { showError(data.error || '배치 제출 실패'); return; }
-
-      currentBatchIdTranslate = data.batch_id;
-      _showTranslateBatchPanel(data.batch_id, '⏳ 배치 번역 제출 완료. 수분~1시간 내 처리됩니다.', false);
-      localStorage.setItem('batchId_translate', data.batch_id);
-      localStorage.setItem('batchMeta_translate', JSON.stringify({ targetLangs }));
-      startTranslateBatchPolling();
+      _addBatchJob(data.batch_id, 'translate', '/api/translate-batch-status/', { targetLangs });
     } catch (e) {
       showError('배치 제출 오류: ' + e.message);
     } finally {
@@ -2018,82 +2148,7 @@
     }
   }
 
-  function startTranslateBatchPolling() {
-    if (batchPollTimerTranslate) clearInterval(batchPollTimerTranslate);
-    batchPollTimerTranslate = setInterval(checkTranslateBatch, 15000);
-  }
-
-  async function checkTranslateBatch() {
-    if (!currentBatchIdTranslate) return;
-    const checkBtn = document.getElementById('batch-translate-check-btn');
-    const spinner  = document.getElementById('batch-translate-spinner');
-    checkBtn.disabled = true; spinner.classList.add('visible');
-
-    try {
-      const resp = await fetch('/api/translate-batch-status/' + encodeURIComponent(currentBatchIdTranslate));
-      const data = await resp.json();
-
-      if (!resp.ok || data.error) {
-        _showTranslateBatchPanel(currentBatchIdTranslate, '❌ ' + (data.error || '오류'), true);
-        if (batchPollTimerTranslate) { clearInterval(batchPollTimerTranslate); batchPollTimerTranslate = null; }
-        return;
-      }
-      if (data.status !== 'ended') {
-        const c = data.request_counts || {};
-        const total = (c.succeeded || 0) + (c.processing || 0) + (c.errored || 0);
-        _showTranslateBatchPanel(currentBatchIdTranslate,
-          `⏳ 처리 중... (${c.succeeded || 0}/${total}개 완료)`, false);
-        return;
-      }
-
-      // Done
-      if (batchPollTimerTranslate) { clearInterval(batchPollTimerTranslate); batchPollTimerTranslate = null; }
-      localStorage.removeItem('batchId_translate');
-      localStorage.removeItem('batchMeta_translate');
-
-      const errCount = Object.keys(data.errors || {}).length;
-      const msg = errCount
-        ? `✅ 번역 완료 (일부 오류: ${errCount}건)! 결과가 표시됩니다.`
-        : '✅ 번역 완료! 결과가 표시됩니다.';
-      _showTranslateBatchPanel(currentBatchIdTranslate, msg, false);
-
-      lastResults = data.results || {};
-      const errEntries = Object.entries(data.errors || {});
-      if (errEntries.length) showError('일부 실패: ' + errEntries.map(([l, e]) => `${l}: ${e}`).join('; '));
-      if (!lastResults[activeTab]) activeTab = Object.keys(lastResults)[0] || [...selectedTargets][0];
-      renderResultTabs();
-      showResult(activeTab);
-      if (Object.keys(lastResults).length > 0) document.getElementById('validate-after-btn').disabled = false;
-
-    } catch (e) {
-      _showTranslateBatchPanel(currentBatchIdTranslate, '❌ 오류: ' + e.message, true);
-    } finally {
-      checkBtn.disabled = false; spinner.classList.remove('visible');
-    }
-  }
-
-  // ══════════════════════════════════════════════════
-  // BATCH API — VALIDATE
-  // ══════════════════════════════════════════════════
-
-  let currentBatchIdValidate = null;
-  let batchPollTimerValidate = null;
-
-  function dismissBatchValidatePanel() {
-    if (batchPollTimerValidate) { clearInterval(batchPollTimerValidate); batchPollTimerValidate = null; }
-    document.getElementById('batch-validate-panel').classList.remove('visible');
-    localStorage.removeItem('batchId_validate');
-    currentBatchIdValidate = null;
-  }
-
-  function _showValidateBatchPanel(batchId, msg, isError) {
-    document.getElementById('batch-validate-id').textContent = 'Batch ID: ' + batchId;
-    document.getElementById('batch-validate-info').textContent = msg;
-    const panel = document.getElementById('batch-validate-panel');
-    panel.className = 'batch-status-panel' + (isError ? ' error' : '');
-    panel.classList.add('visible');
-  }
-
+  // ── Validate batch submit ──
   async function doValidateBatch() {
     const sourceText = document.getElementById('val-source-text').value.trim();
     if (!sourceText) { showValError('원문을 입력하세요.'); return; }
@@ -2110,7 +2165,6 @@
 
     const btn = document.getElementById('batch-validate-btn');
     btn.disabled = true; btn.textContent = '제출 중...';
-    document.getElementById('batch-validate-panel').classList.remove('visible');
     hideValError();
 
     try {
@@ -2120,12 +2174,7 @@
       });
       const data = await resp.json();
       if (!resp.ok || data.error) { showValError(data.error || '배치 제출 실패'); return; }
-
-      currentBatchIdValidate = data.batch_id;
-      _showValidateBatchPanel(data.batch_id,
-        '⏳ 배치 검증 제출 완료. 수분~1시간 내 처리됩니다. (품질 점수 자동 포함)', false);
-      localStorage.setItem('batchId_validate', data.batch_id);
-      startValidateBatchPolling();
+      _addBatchJob(data.batch_id, 'validate', '/api/validate-batch-status/', {});
     } catch (e) {
       showValError('배치 제출 오류: ' + e.message);
     } finally {
@@ -2133,63 +2182,7 @@
     }
   }
 
-  function startValidateBatchPolling() {
-    if (batchPollTimerValidate) clearInterval(batchPollTimerValidate);
-    batchPollTimerValidate = setInterval(checkValidateBatch, 15000);
-  }
-
-  async function checkValidateBatch() {
-    if (!currentBatchIdValidate) return;
-    const checkBtn = document.getElementById('batch-validate-check-btn');
-    const spinner  = document.getElementById('batch-validate-spinner');
-    checkBtn.disabled = true; spinner.classList.add('visible');
-
-    try {
-      const resp = await fetch('/api/validate-batch-status/' + encodeURIComponent(currentBatchIdValidate));
-      const data = await resp.json();
-
-      if (!resp.ok || data.error) {
-        _showValidateBatchPanel(currentBatchIdValidate, '❌ ' + (data.error || '오류'), true);
-        if (batchPollTimerValidate) { clearInterval(batchPollTimerValidate); batchPollTimerValidate = null; }
-        return;
-      }
-      if (data.status !== 'ended') {
-        const c = data.request_counts || {};
-        const total = (c.succeeded || 0) + (c.processing || 0) + (c.errored || 0);
-        _showValidateBatchPanel(currentBatchIdValidate,
-          `⏳ 처리 중... (${c.succeeded || 0}/${total}개 완료)`, false);
-        return;
-      }
-
-      // Done
-      if (batchPollTimerValidate) { clearInterval(batchPollTimerValidate); batchPollTimerValidate = null; }
-      localStorage.removeItem('batchId_validate');
-
-      _showValidateBatchPanel(currentBatchIdValidate, '✅ 검증 완료! 결과가 아래에 표시됩니다.', false);
-      renderValidation(data.results || {}, 'val-result-cards', 'val-validation-panel');
-
-    } catch (e) {
-      _showValidateBatchPanel(currentBatchIdValidate, '❌ 오류: ' + e.message, true);
-    } finally {
-      checkBtn.disabled = false; spinner.classList.remove('visible');
-    }
-  }
-
-  // ══════════════════════════════════════════════════
-  // BATCH API (patent verify — 50% cost reduction)
-  // ══════════════════════════════════════════════════
-
-  let currentBatchId = null;
-  let batchPollTimer = null;
-
-  function dismissBatchPanel() {
-    if (batchPollTimer) { clearInterval(batchPollTimer); batchPollTimer = null; }
-    document.getElementById('batch-status-panel').classList.remove('visible');
-    localStorage.removeItem('lastBatchId');
-    localStorage.removeItem('lastBatchMeta');
-    currentBatchId = null;
-  }
-
+  // ── Patent verify batch submit ──
   async function doPatentVerifyBatch() {
     hidePatentError();
     if (patentFiles.some(f => f.loading)) { showPatentError('파일 추출이 완료될 때까지 기다려 주세요.'); return; }
@@ -2205,15 +2198,12 @@
 
     const btn = document.getElementById('patent-batch-btn');
     btn.disabled = true; btn.textContent = '제출 중...';
-    const panel = document.getElementById('batch-status-panel');
-    panel.className = 'batch-status-panel';
-    panel.classList.remove('visible');
 
     try {
       const resp = await fetch('/api/patent-verify-batch', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          source_text:     src.text,
+          source_text:      src.text,
           translation_text: trl.text,
           instruction_text: instr,
           notes_text:       note   ? note.text   : '',
@@ -2224,99 +2214,15 @@
       });
       const data = await resp.json();
       if (!resp.ok || data.error) { showPatentError(data.error || '배치 제출 실패'); return; }
-
-      currentBatchId = data.batch_id;
-      _showBatchPanel(data.batch_id, '⏳ 배치 작업 제출 완료. 보통 수분~1시간 내 처리됩니다.', false);
-
-      // Persist across page reloads
-      localStorage.setItem('lastBatchId', data.batch_id);
-      localStorage.setItem('lastBatchMeta', JSON.stringify({
+      _addBatchJob(data.batch_id, 'patent', '/api/batch-status/', {
         sourceName: src.file.name,
         translationName: trl.file.name,
         translationText: trl.text,
-      }));
-
-      startBatchPolling();
+      });
     } catch (e) {
       showPatentError('배치 제출 오류: ' + e.message);
     } finally {
       btn.disabled = false; btn.textContent = '💰 배치 검증 (50% 절감)';
-    }
-  }
-
-  function _showBatchPanel(batchId, statusMsg, isError) {
-    const panel = document.getElementById('batch-status-panel');
-    document.getElementById('batch-id-text').textContent = 'Batch ID: ' + batchId;
-    document.getElementById('batch-status-info').textContent = statusMsg;
-    panel.className = 'batch-status-panel' + (isError ? ' error' : '');
-    panel.classList.add('visible');
-  }
-
-  function startBatchPolling() {
-    if (batchPollTimer) clearInterval(batchPollTimer);
-    batchPollTimer = setInterval(checkBatchStatus, 15000);
-  }
-
-  async function checkBatchStatus() {
-    if (!currentBatchId) return;
-
-    const checkBtn    = document.getElementById('batch-check-btn');
-    const checkSpinner = document.getElementById('batch-check-spinner');
-    checkBtn.disabled = true;
-    checkSpinner.classList.add('visible');
-
-    try {
-      const resp = await fetch('/api/batch-status/' + encodeURIComponent(currentBatchId));
-      const data = await resp.json();
-
-      if (!resp.ok || data.error) {
-        _showBatchPanel(currentBatchId, '❌ ' + (data.error || '상태 확인 실패'), true);
-        if (batchPollTimer) { clearInterval(batchPollTimer); batchPollTimer = null; }
-        return;
-      }
-
-      if (data.status !== 'ended') {
-        const c = data.request_counts || {};
-        const detail = c.processing != null
-          ? ` (처리 중: ${c.processing}, 완료: ${c.succeeded})`
-          : '';
-        _showBatchPanel(currentBatchId, `⏳ 처리 중${detail}...`, false);
-        return;
-      }
-
-      // Batch ended
-      if (batchPollTimer) { clearInterval(batchPollTimer); batchPollTimer = null; }
-      localStorage.removeItem('lastBatchId');
-
-      if (data.error) {
-        _showBatchPanel(currentBatchId, '❌ ' + data.error, true);
-        return;
-      }
-
-      _showBatchPanel(currentBatchId, '✅ 검증 완료! 결과가 아래에 표시됩니다.', false);
-
-      // Render results using saved metadata
-      const meta = JSON.parse(localStorage.getItem('lastBatchMeta') || '{}');
-      localStorage.removeItem('lastBatchMeta');
-      lastPatentResult = data.result;
-      lastPatentResult._translationText = meta.translationText || '';
-      lastPatentResult._filenames = {
-        source: meta.sourceName || '', translation: meta.translationName || '',
-        notes: '', drawing_src: '', drawing_trl: '', ser: '',
-      };
-      renderPatentResults(data.result);
-      document.getElementById('patent-report-xlsx').style.display = 'inline-flex';
-      document.getElementById('patent-report-docx').style.display = 'inline-flex';
-      const hasCorrectable = (data.result.issues || []).some(
-        i => i.severity === '심각' && i.corrected_en && i.corrected_en.trim()
-      );
-      document.getElementById('patent-corrected-docx').style.display = hasCorrectable ? 'inline-flex' : 'none';
-
-    } catch (e) {
-      _showBatchPanel(currentBatchId, '❌ 오류: ' + e.message, true);
-    } finally {
-      checkBtn.disabled = false;
-      checkSpinner.classList.remove('visible');
     }
   }
 
@@ -2328,26 +2234,34 @@
   addValPair('ja');
   addValPair('zh');
 
-  // Resume any pending batch jobs from a previous session
+  // Restore pending batch jobs and migrate any legacy single-job storage
   (function resumePendingBatches() {
-    const tId = localStorage.getItem('batchId_translate');
-    if (tId) {
-      currentBatchIdTranslate = tId;
-      _showTranslateBatchPanel(tId, '⏳ 이전 번역 배치 작업을 재개합니다...', false);
-      startTranslateBatchPolling();
-    }
-    const vId = localStorage.getItem('batchId_validate');
-    if (vId) {
-      currentBatchIdValidate = vId;
-      _showValidateBatchPanel(vId, '⏳ 이전 검증 배치 작업을 재개합니다...', false);
-      startValidateBatchPolling();
-    }
-    const pId = localStorage.getItem('lastBatchId');
-    if (pId) {
-      currentBatchId = pId;
-      _showBatchPanel(pId, '⏳ 이전 특허 검증 배치 작업을 재개합니다...', false);
-      startBatchPolling();
-    }
+    const legacy = [
+      { key: 'batchId_translate', type: 'translate', ep: '/api/translate-batch-status/', metaKey: null },
+      { key: 'batchId_validate',  type: 'validate',  ep: '/api/validate-batch-status/', metaKey: null },
+      { key: 'lastBatchId',       type: 'patent',    ep: '/api/batch-status/',           metaKey: 'lastBatchMeta' },
+    ];
+    legacy.forEach(({ key, type, ep, metaKey }) => {
+      const id = localStorage.getItem(key);
+      if (!id) return;
+      if (!_batchQueue.find(j => j.batchId === id)) {
+        let meta = {};
+        if (metaKey) { try { meta = JSON.parse(localStorage.getItem(metaKey) || '{}'); } catch {} }
+        _batchQueue.push({
+          localId: Date.now() + '_migr_' + type,
+          batchId: id, type, statusEndpoint: ep, meta,
+          status: 'processing',
+          submittedAt: new Date(Date.now() - 60000).toISOString(),
+          statusMsg: '⏳ 처리 중...',
+        });
+      }
+      localStorage.removeItem(key);
+      if (metaKey) localStorage.removeItem(metaKey);
+    });
+    localStorage.removeItem('batchMeta_translate');
+
+    ['translate', 'validate', 'patent'].forEach(_renderQueue);
+    if (_batchQueue.some(j => j.status === 'processing')) _startBatchPoll();
   })();
 </script>
 </body>
