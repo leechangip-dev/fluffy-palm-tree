@@ -44,7 +44,7 @@ def _cookies_from_browser(context) -> dict:
     return {c["name"]: c["value"] for c in context.cookies()}
 
 
-def run(cfg: dict) -> None:
+def run(cfg: dict, dry_run: bool = False) -> None:
     sgsc_cfg = cfg["sgsc"]
     base_url = sgsc_cfg["base_url"]
 
@@ -110,7 +110,18 @@ def run(cfg: dict) -> None:
         logger.info("신청자 선택 완료")
 
         captcha = page.locator('#form_lecture_reg input[name="captcha"]')
-        if captcha.count() > 0 and captcha.first.is_visible():
+        has_captcha = captcha.count() > 0 and captcha.first.is_visible()
+
+        if dry_run:
+            logger.info(
+                "[dry-run] 여기서 멈춥니다. 실제 제출 버튼은 누르지 않았습니다. "
+                "브라우저 창에서 폼 상태(선택된 수강기간/신청자, 캡차 유무)를 "
+                "직접 확인해보세요."
+            )
+            page.pause()
+            return
+
+        if has_captcha:
             logger.warning(
                 "캡차가 감지되었습니다. 자동으로 풀 수 없으니 브라우저 창에서 "
                 "직접 입력한 뒤 신청 버튼을 눌러주세요. 스크립트는 여기서 멈춥니다."
@@ -134,11 +145,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="광교복합체육센터 수강신청 자동화")
     parser.add_argument("config", help="YAML 설정 파일 경로")
     parser.add_argument("--env-file", default=".env", help="환경변수(.env) 파일 경로")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="수강기간/신청자 선택까지만 하고 실제 제출 버튼은 누르지 않음(리허설용)",
+    )
     args = parser.parse_args()
 
     load_dotenv(args.env_file)
     cfg = load_config(args.config)
-    run(cfg)
+    run(cfg, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
