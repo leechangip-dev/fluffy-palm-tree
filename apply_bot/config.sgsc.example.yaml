@@ -1,20 +1,14 @@
-# 광교복합체육센터(www.sgsc.co.kr) 수영 강좌 신청용 설정
+# 광교복합체육센터(www.sgsc.co.kr) 수영 월 정기권 신청용 설정
 #
-# 로그인 폼(https://www.sgsc.co.kr/fmcs/26)의 실제 구조를 확인해 아래 login
-# 섹션은 채워두었습니다. submit 섹션(실제 수강신청 제출)은 아직 확인하지
-# 못했으니, 강좌 목록/신청 페이지의 view-source를 추가로 확인한 뒤 채워야
-# 합니다 — 그 전까지는 이 파일로 실행하지 마세요.
-#
-# 사용법: cp config.sgsc.example.yaml config.yaml 후 target.open_at과
-# submit 섹션을 채우고, .env에 SGSC_ID / SGSC_PW를 설정하세요.
-
 # 이 사이트는 apply_bot.runner(범용 http/browser 모드)가 아니라
 # apply_bot.sgsc_apply 전용 스크립트로 실행합니다:
+#   cp config.sgsc.example.yaml config.yaml
+#   cp .env.example .env   # SGSC_ID / SGSC_PW 채우기
 #   python -m apply_bot.sgsc_apply config.yaml
 
 target:
   name: "광교복합체육센터 수영 월 정기권"
-  open_at: "2026-08-01 09:00:00"   # 실제 신청 오픈 일시로 수정
+  open_at: "2026-07-24 06:00:00"
   timezone: "Asia/Seoul"
 
 time_sync:
