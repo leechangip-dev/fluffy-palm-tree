@@ -1,0 +1,58 @@
+# apply_bot 설정 예시 (수영 정기권 등, 특정 시각에 오픈되는 신청용)
+# 1) 이 파일을 config.yaml로 복사한 뒤 사이트에 맞게 값을 채우세요.
+# 2) ${VAR} 형태는 환경변수(.env 또는 셸)에서 값을 가져옵니다. 아이디/비밀번호를
+#    이 파일에 직접 적지 마세요.
+
+mode: http  # http(직접 요청, 빠름) 또는 browser(Playwright, 범용) 중 선택
+
+target:
+  name: "OO구민체육센터 수영 월 정기권"
+  open_at: "2026-08-01 09:00:00"   # 신청이 열리는 정확한 일시
+  timezone: "Asia/Seoul"
+
+# 서버 시각과 로컬 시각의 오차를 보정하기 위해 기준으로 삼을 URL(대상 사이트 도메인 추천)
+time_sync:
+  reference_url: "https://example-swimcenter.or.kr/"
+  samples: 7
+
+# T-0 몇 초 전에 연결을 미리 맺어둘지(HTTP) / 폼 페이지로 미리 이동해둘지(browser)
+prewarm_lead_seconds: 2.0
+
+# ---- mode: http 일 때 사용 ----
+http:
+  login_url: "https://example-swimcenter.or.kr/login"
+  login_method: POST
+  login_fields:
+    userId: "${SWIM_SITE_ID}"
+    userPw: "${SWIM_SITE_PW}"
+
+  submit_url: "https://example-swimcenter.or.kr/apply"
+  submit_method: POST
+  submit_fields:
+    courseId: "12345"
+    termAgree: "Y"
+
+  success_indicator:
+    status_code: 200
+    body_contains: "신청이 완료"
+
+# ---- mode: browser 일 때 사용 ----
+browser:
+  headless: true
+  login_url: "https://example-swimcenter.or.kr/login"
+  id_selector: "#userId"
+  pw_selector: "#userPw"
+  login_button_selector: "#loginBtn"
+  credentials_id: "${SWIM_SITE_ID}"
+  credentials_pw: "${SWIM_SITE_PW}"
+
+  form_url: "https://example-swimcenter.or.kr/apply"
+  reload_before_submit: true
+  submit_button_selector: "#applyBtn"
+  success_selector: ".apply-success"
+  # success_text: "신청이 완료"  # success_selector가 없을 때 대체로 사용
+
+retry:
+  max_attempts: 20
+  window_seconds: 15
+  backoff_seconds: 0.3
