@@ -20,17 +20,24 @@ prewarm_lead_seconds: 2.0
 
 # ---- mode: http 일 때 사용 ----
 http:
+  # 이 사이트(FMCS 계열 CMS)는 폼마다 SecurityToken 히든필드(CSRF)를 새로 발급한다.
+  # 지정해두면 로그인 직전, 그리고 제출 직전에 자동으로 최신 값을 읽어와 채워준다.
+  csrf_field: SecurityToken
+
   login_url: "https://example-swimcenter.or.kr/login"
   login_method: POST
   login_fields:
     userId: "${SWIM_SITE_ID}"
     userPw: "${SWIM_SITE_PW}"
+  # login_token_url: 생략 시 login_url을 GET해서 토큰을 읽음
 
   submit_url: "https://example-swimcenter.or.kr/apply"
   submit_method: POST
   submit_fields:
     courseId: "12345"
     termAgree: "Y"
+  # submit_token_url: 생략 시 submit_url을 GET해서 토큰을 읽음. 실제 신청 폼이
+  # submit_url과 다른 페이지에 있다면(예: 강좌 상세 페이지) 그 URL을 명시할 것.
 
   success_indicator:
     status_code: 200

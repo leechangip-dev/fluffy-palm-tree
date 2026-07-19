@@ -1,0 +1,49 @@
+# 광교복합체육센터(www.sgsc.co.kr) 수영 강좌 신청용 설정
+#
+# 로그인 폼(https://www.sgsc.co.kr/fmcs/26)의 실제 구조를 확인해 아래 login
+# 섹션은 채워두었습니다. submit 섹션(실제 수강신청 제출)은 아직 확인하지
+# 못했으니, 강좌 목록/신청 페이지의 view-source를 추가로 확인한 뒤 채워야
+# 합니다 — 그 전까지는 이 파일로 실행하지 마세요.
+#
+# 사용법: cp config.sgsc.example.yaml config.yaml 후 target.open_at과
+# submit 섹션을 채우고, .env에 SGSC_ID / SGSC_PW를 설정하세요.
+
+mode: http
+
+target:
+  name: "광교복합체육센터 수영 강좌"
+  open_at: "2026-08-01 09:00:00"   # 실제 신청 오픈 일시로 수정
+  timezone: "Asia/Seoul"
+
+time_sync:
+  reference_url: "https://www.sgsc.co.kr/"
+  samples: 7
+
+prewarm_lead_seconds: 2.0
+
+http:
+  csrf_field: SecurityToken
+
+  login_url: "https://www.sgsc.co.kr/fmcs/26"
+  login_method: POST
+  login_fields:
+    user_id: "${SGSC_ID}"
+    user_password: "${SGSC_PW}"
+
+  # TODO: 아래 두 값은 아직 확인되지 않았습니다.
+  # 강좌 목록(로그인 후 https://www.sgsc.co.kr/fmcs/12?...) 페이지에서
+  # 원하는 강좌의 "신청" 버튼/링크가 가리키는 실제 제출 URL과, 신청 폼에
+  # 포함된 히든 필드(강좌 코드 등)를 확인해 채워 넣어야 합니다.
+  submit_url: "https://www.sgsc.co.kr/fmcs/__TODO__"
+  submit_method: POST
+  submit_fields:
+    class: "1000030000"   # 예시: URL의 class 파라미터와 동일한 값으로 추정됨(확인 필요)
+
+  success_indicator:
+    status_code: 200
+    body_contains: "신청이 완료"   # 실제 성공 문구로 수정 필요
+
+retry:
+  max_attempts: 20
+  window_seconds: 15
+  backoff_seconds: 0.3
