@@ -150,10 +150,24 @@ def main() -> None:
         action="store_true",
         help="수강기간/신청자 선택까지만 하고 실제 제출 버튼은 누르지 않음(리허설용)",
     )
+    parser.add_argument(
+        "--open-at",
+        help="target.open_at을 덮어씀 (형식: 'YYYY-MM-DD HH:MM:SS', config.yaml의 timezone 기준)",
+    )
+    parser.add_argument(
+        "--name-contains",
+        help="sgsc.name_contains를 덮어씀(강좌명 일부로 필터링). 빈 문자열이면 필터 없음",
+    )
     args = parser.parse_args()
 
     load_dotenv(args.env_file)
     cfg = load_config(args.config)
+
+    if args.open_at:
+        cfg.setdefault("target", {})["open_at"] = args.open_at
+    if args.name_contains is not None:
+        cfg.setdefault("sgsc", {})["name_contains"] = args.name_contains
+
     run(cfg, dry_run=args.dry_run)
 
 
