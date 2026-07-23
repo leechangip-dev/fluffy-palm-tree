@@ -4,11 +4,10 @@
 처리한다. 신청서에 캡차가 나타나면 자동화를 멈추고 사람이 마무리하도록 만들었다
 (캡차를 자동으로 우회하지 않는다 — 정상적인 봇 방지 장치이므로).
 
-주의: 이 스크립트는 실제 사이트에 대해 end-to-end로 검증되지 않았다. 이 코드가
-작성된 개발 환경에서는 조직 네트워크 정책상 www.sgsc.co.kr로 접속할 수 없어,
-로그인 폼과 강좌 목록 API 응답(자바스크립트 코드로부터 확인)만으로 구현했다.
-실제 신청일 전에 반드시 다른(수영이 아니어도 되는) 현재 접수중인 강좌로 먼저
-리허설해서 셀렉터(#form_lecture_reg 관련)가 실제 페이지와 맞는지 확인할 것.
+신청서 페이지(#form_lecture_reg, itemcd/memno 라디오, 제출 버튼 셀렉터)는 실제
+페이지의 view-source로 검증되었다. 다만 itemcd/memno가 전부 비활성화된 상태로만
+확인했으므로(관내접수기간 제한), 실제로 선택 가능한 상태에서의 제출 자체는
+아직 사람이 직접 지켜보며 확인한 적이 없다.
 """
 from __future__ import annotations
 
@@ -19,6 +18,7 @@ from zoneinfo import ZoneInfo
 
 import requests
 from dotenv import load_dotenv
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
 from . import timing
@@ -42,6 +42,28 @@ def _target_epoch(cfg: dict) -> float:
 
 def _cookies_from_browser(context) -> dict:
     return {c["name"]: c["value"] for c in context.cookies()}
+
+
+def _select_first_enabled_radio(page, name: str, timeout: int = 10000):
+    """지정된 name의 라디오 중 비활성화되지 않은 첫 번째 것을 선택한다.
+
+    전부 비활성화된 상태라면(예: 관내접수기간 제한, 마감 등) 그 title 속성에
+    담긴 사유를 로그로 남기고 예외를 던진다 — 단순 타임아웃보다 원인 파악이
+    쉽도록.
+    """
+    enabled = page.locator(f'#form_lecture_reg input[name="{name}"]:not([disabled])').first
+    try:
+        enabled.wait_for(state="visible", timeout=timeout)
+    except PlaywrightTimeoutError:
+        disabled = page.locator(f'#form_lecture_reg input[name="{name}"][disabled]').first
+        if disabled.count() > 0:
+            reason = disabled.get_attribute("title") or "사유 미상"
+            logger.error("'%s' 항목 중 선택 가능한 것이 없습니다 (사유: %s)", name, reason)
+        else:
+            logger.error("'%s' 항목을 찾지 못했습니다.", name)
+        raise
+    enabled.check()
+    return enabled
 
 
 def run(cfg: dict, dry_run: bool = False) -> None:
@@ -99,14 +121,10 @@ def run(cfg: dict, dry_run: bool = False) -> None:
         )
         page.goto(read_url, wait_until="domcontentloaded")
 
-        itemcd = page.locator('#form_lecture_reg input[name="itemcd"]:not([disabled])').first
-        itemcd.wait_for(state="visible", timeout=10000)
-        itemcd.check()
+        _select_first_enabled_radio(page, "itemcd")
         logger.info("수강기간 선택 완료")
 
-        memno = page.locator('#form_lecture_reg input[name="memno"]:not([disabled])').first
-        memno.wait_for(state="visible", timeout=10000)
-        memno.check()
+        _select_first_enabled_radio(page, "memno")
         logger.info("신청자 선택 완료")
 
         captcha = page.locator('#form_lecture_reg input[name="captcha"]')
